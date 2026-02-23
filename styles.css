@@ -1066,6 +1066,11 @@ textarea {
   margin-bottom: 14px;
 }
 
+.activity-form[hidden],
+.dashboard-quick-form[hidden] {
+  display: none !important;
+}
+
 .activity-form .add-btn {
   height: 42px;
 }
@@ -1113,15 +1118,26 @@ textarea {
 }
 
 .itinerary-card-head {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 1fr auto;
   gap: 8px;
-  justify-content: space-between;
-  flex-wrap: wrap;
+  align-items: start;
 }
 
 .itinerary-card-head strong {
   font-size: 0.95rem;
+}
+
+.itinerary-card-title-wrap {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.itinerary-card-date-title {
+  color: var(--brand);
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .itinerary-card-meta {

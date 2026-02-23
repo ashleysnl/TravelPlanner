@@ -808,11 +808,13 @@ function renderItineraryList(summary) {
               <div class="itinerary-card">
                 <div class="itinerary-card-main">
                   <div class="itinerary-card-head">
-                    <strong>${escapeHtml(item.title)}</strong>
+                    <div class="itinerary-card-title-wrap">
+                      <span class="itinerary-card-date-title">${shortDate(item.date)} • ${item.time || "--:--"}</span>
+                      <strong>${escapeHtml(item.title)}</strong>
+                    </div>
                     <span class="status-pill status-${item.status}">${item.status}</span>
                   </div>
                   <div class="itinerary-card-meta">
-                    <span>${shortDate(item.date)} • ${item.time || "--:--"}</span>
                     <span>${escapeHtml(item.category)}</span>
                     <span>${normalizeCurrency(item.currency)}</span>
                   </div>

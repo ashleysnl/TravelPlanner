@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vacation Trip Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Vacation Planner</p>
+        <h1 id="heroTripTitle">Trip Dashboard & Timeline</h1>
+        <p class="hero-copy">
+          Plan activities, add extra cost items, track planned vs paid amounts, convert USD to CAD, and print a clean summary report.
+        </p>
+      </div>
+      <div class="hero-actions no-print">
+        <button id="printReportBtn" class="btn btn-primary">Print / Save as PDF</button>
+        <button id="resetDemoBtn" class="btn btn-secondary">Reset Demo Data</button>
+      </div>
+    </header>
+
+    <main class="tabbed-layout">
+      <nav class="tabs no-print" aria-label="App Sections">
+        <button type="button" class="tab-btn active" data-tab-target="dashboard">Dashboard</button>
+        <button type="button" class="tab-btn" data-tab-target="itinerary">Itinerary</button>
+        <button type="button" class="tab-btn" data-tab-target="costs">Costs</button>
+        <button type="button" class="tab-btn" data-tab-target="settings">Settings</button>
+        <button type="button" class="tab-btn" data-tab-target="report">Report</button>
+      </nav>
+
+      <section class="panel dashboard-panel tab-panel active" data-tab-panel="dashboard" aria-labelledby="dashboard-heading">
+        <div class="panel-header">
+          <h2 id="dashboard-heading">Budget Dashboard</h2>
+          <p>Planned vs paid totals and category breakdown</p>
+        </div>
+
+        <div class="dashboard-trip-header">
+          <h3 id="dashboardTripTitle">Trip</h3>
+          <p id="dashboardTripMeta" class="muted"></p>
+        </div>
+
+        <div class="metric-grid" id="metricGrid"></div>
+
+        <div class="breakdown-wrap">
+          <div class="subsection">
+            <h3>Category Breakdown (Planned)</h3>
+            <div id="categoryBreakdown" class="category-list"></div>
+          </div>
+          <div class="subsection">
+            <h3>Budget Health</h3>
+            <div class="progress-card">
+              <div class="progress-row">
+                <span>Planned vs Budget</span>
+                <span id="plannedBudgetPct">0%</span>
+              </div>
+              <div class="progress-track">
+                <div id="plannedBudgetBar" class="progress-fill planned"></div>
+              </div>
+              <div class="progress-row">
+                <span>Paid vs Budget</span>
+                <span id="paidBudgetPct">0%</span>
+              </div>
+              <div class="progress-track">
+                <div id="paidBudgetBar" class="progress-fill paid"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="subsection dashboard-itinerary">
+          <div class="timeline-head">
+            <h3>Itinerary Timeline</h3>
+            <p id="dashboardTimelineRange" class="muted small-copy"></p>
+          </div>
+          <div id="dashboardItinerary" class="dashboard-timeline"></div>
+        </div>
+      </section>
+
+      <section class="panel activities-panel tab-panel" data-tab-panel="itinerary" aria-labelledby="timeline-heading" hidden>
+        <div class="panel-header">
+          <h2 id="timeline-heading">Itinerary Builder</h2>
+          <p>Build your trip itinerary with scheduled activities and costs</p>
+        </div>
+
+        <form id="activityForm" class="activity-form no-print">
+          <input type="hidden" id="activityFormMode" value="add" />
+          <input type="hidden" id="activityEditId" />
+          <div class="dashboard-quick-form-header">
+            <strong id="activityFormTitle">Add Itinerary Item</strong>
+            <button id="activityFormCancelEdit" type="button" class="icon-btn" hidden>Cancel Edit</button>
+          </div>
+          <label>
+            Date
+            <input type="date" id="activityDate" required />
+          </label>
+          <label>
+            Time
+            <input type="time" id="activityTime" required />
+          </label>
+          <label>
+            Activity
+            <input type="text" id="activityTitle" placeholder="Everglades Airboat Tour" required />
+          </label>
+          <label>
+            Location
+            <input type="text" id="activityLocation" placeholder="Miami" />
+          </label>
+          <label>
+            Category
+            <select id="activityCategory">
+              <option value="Lodging">Lodging</option>
+              <option value="Transportation">Transportation</option>
+              <option value="Food">Food</option>
+              <option value="Activities">Activities</option>
+              <option value="Park Passes">Park Passes</option>
+              <option value="Shopping">Shopping</option>
+              <option value="Misc">Misc</option>
+              <option value="__add__">Add Category...</option>
+            </select>
+          </label>
+          <label>
+            Currency
+            <select id="activityCurrency">
+              <option value="USD">USD</option>
+              <option value="CAD">CAD</option>
+            </select>
+          </label>
+          <label>
+            Planned
+            <input type="number" id="activityPlannedUsd" min="0" step="0.01" required />
+          </label>
+          <label>
+            Paid
+            <input type="number" id="activityPaidUsd" min="0" step="0.01" value="0" />
+          </label>
+          <label>
+            Status
+            <select id="activityStatus">
+              <option value="Planned">Planned</option>
+              <option value="Booked">Booked</option>
+              <option value="Paid">Paid</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </label>
+          <button id="activityFormSubmit" type="submit" class="btn btn-primary add-btn">Add Activity</button>
+        </form>
+
+        <div class="table-wrap">
+          <table id="activitiesTable">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Activity</th>
+                <th>Location</th>
+                <th>Category</th>
+                <th>Curr</th>
+                <th>Planned</th>
+                <th>Paid</th>
+                <th>Status</th>
+                <th class="no-print">Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel costs-panel tab-panel" data-tab-panel="costs" aria-labelledby="cost-items-heading" hidden>
+        <div class="panel-header">
+          <h2 id="cost-items-heading">Additional Cost Items</h2>
+          <p>Add cost line items and optionally include them on the itinerary</p>
+        </div>
+
+        <form id="costItemForm" class="activity-form no-print">
+          <input type="hidden" id="costItemFormMode" value="add" />
+          <input type="hidden" id="costItemEditId" />
+          <div class="dashboard-quick-form-header">
+            <strong id="costItemFormTitle">Add Cost Item</strong>
+            <button id="costItemFormCancelEdit" type="button" class="icon-btn" hidden>Cancel Edit</button>
+          </div>
+          <label>
+            Cost Item
+            <input type="text" id="costItemTitle" placeholder="Travel Insurance" required />
+          </label>
+          <label>
+            Category
+            <select id="costItemCategory">
+              <option value="Transportation">Transportation</option>
+              <option value="Lodging">Lodging</option>
+              <option value="Food">Food</option>
+              <option value="Activities">Activities</option>
+              <option value="Park Passes">Park Passes</option>
+              <option value="Shopping">Shopping</option>
+              <option value="Misc">Misc</option>
+              <option value="__add__">Add Category...</option>
+            </select>
+          </label>
+          <label>
+            Currency
+            <select id="costItemCurrency">
+              <option value="USD">USD</option>
+              <option value="CAD">CAD</option>
+            </select>
+          </label>
+          <label>
+            Planned
+            <input type="number" id="costItemPlannedUsd" min="0" step="0.01" required />
+          </label>
+          <label>
+            Paid
+            <input type="number" id="costItemPaidUsd" min="0" step="0.01" value="0" />
+          </label>
+          <label class="checkbox-field">
+            Include on Itinerary
+            <span class="checkbox-inline">
+              <input type="checkbox" id="costItemIncludeInItinerary" />
+              Show this cost item in itinerary timeline
+            </span>
+          </label>
+          <label>
+            Itinerary Date (optional)
+            <input type="date" id="costItemItineraryDate" />
+          </label>
+          <label>
+            Itinerary Time (optional)
+            <input type="time" id="costItemItineraryTime" />
+          </label>
+          <label>
+            Itinerary Location (optional)
+            <input type="text" id="costItemItineraryLocation" placeholder="Orlando Airport" />
+          </label>
+          <label>
+            Itinerary Status
+            <select id="costItemItineraryStatus">
+              <option value="Planned">Planned</option>
+              <option value="Booked">Booked</option>
+              <option value="Paid">Paid</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </label>
+          <button id="costItemFormSubmit" type="submit" class="btn btn-primary add-btn">Add Cost Item</button>
+        </form>
+
+        <div class="table-wrap">
+          <table id="costItemsTable">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th>Curr</th>
+                <th>Planned</th>
+                <th>Paid</th>
+                <th>Itinerary</th>
+                <th class="no-print">Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel control-panel no-print tab-panel" data-tab-panel="settings" aria-labelledby="trip-settings-heading" hidden>
+        <div class="panel-header">
+          <h2 id="trip-settings-heading">Trip Settings</h2>
+          <p>Trip details and exchange rate</p>
+        </div>
+
+        <form id="settingsForm" class="stack-form">
+          <label>
+            Trip Name
+            <input type="text" id="tripName" placeholder="Family Vacation" />
+          </label>
+          <label>
+            Travelers
+            <input type="number" id="travelers" min="1" value="2" />
+          </label>
+          <label>
+            Start Date
+            <input type="date" id="startDate" />
+          </label>
+          <label>
+            End Date
+            <input type="date" id="endDate" />
+          </label>
+          <label>
+            Total Budget (CDN)
+            <input type="number" id="totalBudgetCad" min="0" step="0.01" />
+          </label>
+          <label>
+            USD to CAD Rate (CDN)
+            <input type="number" id="usdToCadRate" min="0" step="0.0001" />
+          </label>
+        </form>
+
+        <div class="subsection no-print backup-tools">
+          <h3>Backup</h3>
+          <div class="backup-actions">
+            <button id="exportJsonBtn" type="button" class="btn btn-primary">Export JSON Backup</button>
+            <button id="importJsonBtn" type="button" class="btn btn-secondary control-btn">Import JSON Backup</button>
+            <input id="importJsonFile" type="file" accept="application/json,.json" hidden />
+          </div>
+          <div class="backup-status">
+            <p id="backupLastUsed" class="muted small-copy">No backup imported yet on this device.</p>
+            <p id="backupDirtyStatus" class="muted small-copy"></p>
+          </div>
+          <p class="muted small-copy">Use this before clearing browser data.</p>
+        </div>
+      </section>
+
+      <section class="panel report-panel tab-panel" data-tab-panel="report" aria-labelledby="report-heading" hidden>
+        <div class="panel-header">
+          <h2 id="report-heading">Printable Report</h2>
+          <p>Designed for print / PDF sharing</p>
+        </div>
+
+        <div id="reportContent" class="report-content">
+          <div class="report-top">
+            <div>
+              <p class="report-kicker">Trip Summary</p>
+              <h3 id="reportTripName">Vacation</h3>
+              <p id="reportTripMeta"></p>
+            </div>
+            <div class="report-note">
+              <p><strong>Exchange Rate:</strong> <span id="reportRate"></span></p>
+              <p><strong>Generated:</strong> <span id="reportGenerated"></span></p>
+            </div>
+          </div>
+
+          <div class="report-metrics" id="reportMetrics"></div>
+
+          <div class="report-section">
+            <h4>Budget Breakdown</h4>
+            <div id="reportBreakdown"></div>
+          </div>
+
+          <div class="report-section">
+            <h4>Activity Timeline</h4>
+            <div id="reportTimeline" class="timeline-report"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <button id="globalSaveBtn" class="global-save-btn no-print" type="button" aria-label="Export JSON Backup" title="Export JSON Backup">
+    Save
+  </button>
+
+  <div id="importReminderModal" class="dashboard-day-detail no-print" hidden>
+    <div class="dashboard-modal-backdrop" data-modal-close="import-reminder"></div>
+    <div class="dashboard-modal-card import-reminder-card" role="dialog" aria-modal="true" aria-labelledby="importReminderTitle">
+      <div class="day-detail-head">
+        <div>
+          <h4 id="importReminderTitle">Import Latest Backup?</h4>
+          <p class="muted small-copy">If you are moving between devices, import your latest JSON backup before making changes.</p>
+          <p id="importReminderLastUsed" class="muted small-copy"></p>
+        </div>
+      </div>
+      <div class="import-reminder-actions">
+        <button id="importReminderImportBtn" type="button" class="btn btn-primary">Import Backup</button>
+        <button id="importReminderDismissBtn" type="button" class="btn btn-secondary control-btn">Continue Without Import</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="dashboardDayDetail" class="dashboard-day-detail no-print" hidden>
+    <div class="dashboard-modal-backdrop" data-modal-close="day-detail"></div>
+    <div class="dashboard-modal-card" role="dialog" aria-modal="true" aria-labelledby="dashboardDayDetailTitle">
+      <div class="day-detail-head">
+        <div>
+          <h4 id="dashboardDayDetailTitle">Select a Day</h4>
+          <p id="dashboardDayDetailMeta" class="muted small-copy">Click a day in the timeline to view items and add a new itinerary item.</p>
+        </div>
+        <button id="dashboardDayDetailClose" type="button" class="icon-btn" aria-label="Close">Close</button>
+      </div>
+      <div id="dashboardDayDetailList" class="day-detail-list"></div>
+      <form id="dashboardQuickActivityForm" class="dashboard-quick-form">
+        <input type="hidden" id="dashboardQuickActivityDate" />
+        <input type="hidden" id="dashboardQuickMode" value="add" />
+        <input type="hidden" id="dashboardQuickEditSource" />
+        <input type="hidden" id="dashboardQuickEditId" />
+        <div class="dashboard-quick-form-header">
+          <strong id="dashboardQuickFormTitle">Add Itinerary Item</strong>
+          <button id="dashboardQuickFormCancelEdit" type="button" class="icon-btn" hidden>Cancel Edit</button>
+        </div>
+        <label>
+          Time
+          <input type="time" id="dashboardQuickActivityTime" required />
+        </label>
+        <label>
+          Item Title
+          <input type="text" id="dashboardQuickActivityTitle" placeholder="Dinner reservation" required />
+        </label>
+        <label>
+          Location
+          <input type="text" id="dashboardQuickActivityLocation" placeholder="Downtown" />
+        </label>
+        <label>
+          Category
+          <select id="dashboardQuickActivityCategory">
+            <option value="Lodging">Lodging</option>
+            <option value="Transportation">Transportation</option>
+            <option value="Food">Food</option>
+            <option value="Activities">Activities</option>
+            <option value="Park Passes">Park Passes</option>
+            <option value="Shopping">Shopping</option>
+            <option value="Misc">Misc</option>
+            <option value="__add__">Add Category...</option>
+          </select>
+        </label>
+        <label>
+          Currency
+          <select id="dashboardQuickActivityCurrency">
+            <option value="USD">USD</option>
+            <option value="CAD">CAD</option>
+          </select>
+        </label>
+        <label>
+          Planned
+          <input type="number" id="dashboardQuickActivityPlannedUsd" min="0" step="0.01" required />
+        </label>
+        <label>
+          Paid
+          <input type="number" id="dashboardQuickActivityPaidUsd" min="0" step="0.01" value="0" />
+        </label>
+        <label>
+          Status
+          <select id="dashboardQuickActivityStatus">
+            <option value="Planned">Planned</option>
+            <option value="Booked">Booked</option>
+            <option value="Paid">Paid</option>
+            <option value="Completed">Completed</option>
+          </select>
+        </label>
+        <button id="dashboardQuickFormSubmit" type="submit" class="btn btn-primary add-btn">Add to Itinerary</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

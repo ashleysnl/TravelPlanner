@@ -595,13 +595,15 @@ textarea {
 }
 
 #dashboardDayDetailClose {
-  position: absolute;
+  position: sticky;
   top: 10px;
-  right: 10px;
+  right: auto;
   z-index: 4;
   border-radius: 999px;
   padding: 8px 12px;
   box-shadow: 0 8px 16px rgba(10, 20, 35, 0.12);
+  margin-left: auto;
+  align-self: flex-start;
 }
 
 .import-reminder-card {
@@ -1389,9 +1391,9 @@ td {
 
   #dashboardDayDetailClose {
     top: 12px;
-    right: 12px;
-    position: absolute;
-    margin-left: 0;
+    right: auto;
+    position: sticky;
+    margin-left: auto;
   }
 
   .report-top {

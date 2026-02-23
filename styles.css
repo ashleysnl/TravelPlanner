@@ -736,6 +736,11 @@ textarea {
   gap: 6px;
 }
 
+.day-detail-row {
+  display: grid;
+  gap: 6px;
+}
+
 .day-detail-item {
   border: 1px solid #e8edf5;
   border-radius: 10px;
@@ -745,6 +750,36 @@ textarea {
   grid-template-columns: 1fr auto;
   gap: 10px;
   align-items: center;
+}
+
+.day-detail-inline-slot {
+  padding-left: 8px;
+}
+
+.day-detail-inline-slot:empty {
+  display: none;
+}
+
+.day-detail-composer {
+  margin-top: 10px;
+}
+
+.day-detail-new {
+  border: 1px dashed #dbe6f5;
+  border-radius: 12px;
+  padding: 10px;
+  background: #fff;
+}
+
+.day-detail-new-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.day-detail-new-head strong {
+  font-size: 0.86rem;
 }
 
 .day-detail-main {
@@ -775,6 +810,11 @@ textarea {
   grid-template-columns: 120px 1.4fr 1.2fr repeat(4, minmax(0, 1fr));
   gap: 8px;
   align-items: end;
+}
+
+.day-detail-inline-slot > .dashboard-quick-form {
+  margin-top: 0;
+  padding-top: 4px;
 }
 
 .dashboard-quick-form > label,

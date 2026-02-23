@@ -148,6 +148,7 @@ const uiState = {
   supportBannerVisible: false,
   appReady: false,
   dashboardQuickEdit: null,
+  dashboardQuickPlacement: null,
   itineraryEditId: null,
   costItemEditId: null,
 };
@@ -190,6 +191,7 @@ const el = {
   dashboardDayDetailTitle: document.getElementById("dashboardDayDetailTitle"),
   dashboardDayDetailMeta: document.getElementById("dashboardDayDetailMeta"),
   dashboardDayDetailList: document.getElementById("dashboardDayDetailList"),
+  dashboardDayDetailComposer: document.getElementById("dashboardDayDetailComposer"),
   dashboardQuickActivityForm: document.getElementById("dashboardQuickActivityForm"),
   dashboardQuickFormTitle: document.getElementById("dashboardQuickFormTitle"),
   dashboardQuickFormCancelEdit: document.getElementById("dashboardQuickFormCancelEdit"),
@@ -783,6 +785,7 @@ function setCostItemFormEditMode(item) {
 function setDashboardQuickFormEditMode(entry) {
   const inputs = el.dashboardQuickActivityInputs;
   uiState.dashboardQuickEdit = { source: entry.source, id: entry.id };
+  uiState.dashboardQuickPlacement = { type: "edit", source: entry.source, id: entry.id };
   inputs.mode.value = "edit";
   inputs.editSource.value = entry.source;
   inputs.editId.value = entry.id;
@@ -799,6 +802,49 @@ function setDashboardQuickFormEditMode(entry) {
   el.dashboardQuickFormTitle.textContent = `Edit ${entry.source === "costItem" ? "Cost Item" : "Itinerary Item"}`;
   el.dashboardQuickFormSubmit.textContent = "Save Changes";
   el.dashboardQuickFormCancelEdit.hidden = false;
+}
+
+function showDashboardQuickNewItemForm() {
+  uiState.dashboardQuickPlacement = { type: "new" };
+  resetDashboardQuickForm({ preserveDate: true });
+  uiState.dashboardQuickPlacement = { type: "new" };
+}
+
+function hideDashboardQuickInlineForm() {
+  uiState.dashboardQuickPlacement = null;
+  uiState.dashboardQuickEdit = null;
+  el.dashboardQuickActivityForm.hidden = true;
+}
+
+function mountDashboardQuickFormInline() {
+  const form = el.dashboardQuickActivityForm;
+  const composer = el.dashboardDayDetailComposer;
+  const list = el.dashboardDayDetailList;
+  if (!form || !composer || !list) return;
+
+  const placement = uiState.dashboardQuickPlacement;
+  if (!uiState.dashboardDayModalOpen || !uiState.dashboardSelectedDate || !placement) {
+    form.hidden = true;
+    return;
+  }
+
+  let slot = null;
+  if (placement.type === "new") {
+    slot = composer.querySelector('[data-inline-slot="new"]');
+  } else if (placement.type === "edit" && placement.source && placement.id) {
+    slot = list.querySelector(
+      `[data-inline-slot="edit"][data-source="${placement.source}"][data-item-id="${placement.id}"]`
+    );
+  }
+
+  if (!slot) {
+    form.hidden = true;
+    return;
+  }
+
+  slot.appendChild(form);
+  form.hidden = false;
+  form.classList.remove("disabled");
 }
 
 function daysBetweenInclusive(start, end) {
@@ -982,8 +1028,10 @@ function renderDashboardDayDetail(summary) {
     el.dashboardDayDetailTitle.textContent = "Select a Day";
     el.dashboardDayDetailMeta.textContent = "Click a day in the timeline to view items and add a new itinerary item.";
     el.dashboardDayDetailList.innerHTML = "";
+    el.dashboardDayDetailComposer.innerHTML = "";
     el.dashboardQuickActivityForm.classList.add("disabled");
     resetDashboardQuickForm({ preserveDate: false });
+    hideDashboardQuickInlineForm();
     return;
   }
   el.dashboardDayDetail.hidden = false;
@@ -1003,35 +1051,53 @@ function renderDashboardDayDetail(summary) {
     ? items
         .map(
           (item) => `
-            <div class="day-detail-item">
-              <div class="day-detail-main">
-                <strong>${escapeHtml(item.title)}</strong>
-                <span>${item.time || "--:--"} • ${escapeHtml(item.category)} • ${escapeHtml(item.status)}${item.source === "costItem" ? " • Cost Item" : ""}</span>
-                <span class="muted">${escapeHtml(item.location || "Location TBD")}</span>
-                ${item.notes ? `<span class="muted">${escapeHtml(item.notes)}</span>` : ""}
+            <div class="day-detail-row">
+              <div class="day-detail-item">
+                <div class="day-detail-main">
+                  <strong>${escapeHtml(item.title)}</strong>
+                  <span>${item.time || "--:--"} • ${escapeHtml(item.category)} • ${escapeHtml(item.status)}${item.source === "costItem" ? " • Cost Item" : ""}</span>
+                  <span class="muted">${escapeHtml(item.location || "Location TBD")}</span>
+                  ${item.notes ? `<span class="muted">${escapeHtml(item.notes)}</span>` : ""}
+                </div>
+                <div class="day-detail-cost">
+                  <strong>${money(amountToCad(item.plannedUsd, item.currency), "CAD")}</strong>
+                  <span class="muted">${money(amountToCad(item.paidUsd, item.currency), "CAD")} paid</span>
+                  <button type="button" class="icon-btn" data-action="editDashboardItem" data-source="${item.source}" data-id="${item.id}">Edit</button>
+                </div>
               </div>
-              <div class="day-detail-cost">
-                <strong>${money(amountToCad(item.plannedUsd, item.currency), "CAD")}</strong>
-                <span class="muted">${money(amountToCad(item.paidUsd, item.currency), "CAD")} paid</span>
-                <button type="button" class="icon-btn" data-action="editDashboardItem" data-source="${item.source}" data-id="${item.id}">Edit</button>
-              </div>
+              <div class="day-detail-inline-slot" data-inline-slot="edit" data-source="${item.source}" data-item-id="${item.id}"></div>
             </div>
           `
         )
         .join("")
     : `<p class="muted">No items for this day yet. Add one below.</p>`;
 
-  el.dashboardQuickActivityForm.classList.remove("disabled");
-  if (uiState.dashboardQuickEdit) {
+  el.dashboardDayDetailComposer.innerHTML = `
+    <div class="day-detail-new">
+      <div class="day-detail-new-head">
+        <strong>New Item</strong>
+        <button type="button" class="icon-btn" data-action="showDashboardNewItem">Add New Item</button>
+      </div>
+      <div class="day-detail-inline-slot" data-inline-slot="new"></div>
+    </div>
+  `;
+
+  if (uiState.dashboardQuickPlacement?.type === "edit" && uiState.dashboardQuickEdit) {
     const active = items.find((item) => item.id === uiState.dashboardQuickEdit.id && item.source === uiState.dashboardQuickEdit.source);
     if (active) {
       setDashboardQuickFormEditMode(active);
     } else {
       resetDashboardQuickForm({ preserveDate: true });
+      uiState.dashboardQuickPlacement = null;
     }
-  } else {
+  } else if (uiState.dashboardQuickPlacement?.type === "new") {
     resetDashboardQuickForm({ preserveDate: true });
+    uiState.dashboardQuickPlacement = { type: "new" };
+  } else {
+    hideDashboardQuickInlineForm();
   }
+
+  mountDashboardQuickFormInline();
 }
 
 function getSortedActivities() {
@@ -1493,6 +1559,7 @@ function addDashboardQuickActivity(event) {
   }
 
   saveState();
+  uiState.dashboardQuickPlacement = null;
   resetDashboardQuickForm({ preserveDate: true });
   uiState.dashboardDayModalOpen = true;
   render();
@@ -1765,6 +1832,17 @@ function handleDashboardDayModalClick(event) {
   }
 
   const editBtn = event.target.closest("button[data-action='editDashboardItem']");
+  const addBtn = event.target.closest("button[data-action='showDashboardNewItem']");
+  if (addBtn) {
+    showDashboardQuickNewItemForm();
+    uiState.dashboardDayModalOpen = true;
+    render();
+    const target = el.dashboardQuickActivityInputs.title;
+    if (target) {
+      requestAnimationFrame(() => target.focus());
+    }
+    return;
+  }
   if (editBtn) {
     const { source, id } = editBtn.dataset;
     if (source === "activity") {
@@ -1787,6 +1865,10 @@ function handleDashboardDayModalClick(event) {
     }
     uiState.dashboardDayModalOpen = true;
     render();
+    const target = el.dashboardQuickActivityInputs.title;
+    if (target) {
+      requestAnimationFrame(() => target.focus());
+    }
   }
 }
 
@@ -1807,6 +1889,8 @@ function handleGlobalKeydown(event) {
 
 function cancelDashboardQuickEdit() {
   resetDashboardQuickForm({ preserveDate: true });
+  hideDashboardQuickInlineForm();
+  render();
 }
 
 function cancelActivityEdit() {

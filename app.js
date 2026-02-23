@@ -717,6 +717,7 @@ function resetDashboardQuickForm({ preserveDate = true } = {}) {
 function resetActivityForm() {
   const inputs = el.activityInputs;
   el.activityForm.reset();
+  el.activityForm.hidden = true;
   inputs.mode.value = "add";
   inputs.editId.value = "";
   inputs.status.value = "Planned";
@@ -1873,6 +1874,10 @@ function openImportPicker() {
 }
 
 function switchTab(tabName) {
+  if (tabName === "itinerary") {
+    hideItineraryInlineForm();
+    resetActivityForm();
+  }
   el.tabButtons.forEach((button) => {
     const isActive = button.dataset.tabTarget === tabName;
     button.classList.toggle("active", isActive);

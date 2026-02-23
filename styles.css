@@ -308,6 +308,41 @@ body {
   align-items: end;
 }
 
+.family-budget-settings {
+  margin-top: 8px;
+  border: 1px solid #edf2fb;
+  border-radius: 12px;
+  background: #fff;
+  padding: 8px 10px 10px;
+}
+
+.family-budget-settings summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.84rem;
+  color: var(--brand);
+  list-style: none;
+}
+
+.family-budget-settings summary::-webkit-details-marker {
+  display: none;
+}
+
+.family-budget-settings summary::after {
+  content: "Show";
+  float: right;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.family-budget-settings[open] summary::after {
+  content: "Hide";
+}
+
+.family-budget-settings > .family-budget-grid {
+  margin-top: 8px;
+}
+
 .family-split-toggle {
   min-width: 0;
 }
@@ -1711,6 +1746,11 @@ td {
   .family-budget-grid,
   .family-budget-cards {
     grid-template-columns: 1fr;
+  }
+
+  .family-budget-settings summary::after {
+    float: none;
+    margin-left: 8px;
   }
 
   .onboarding-actions .btn,

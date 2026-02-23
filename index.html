@@ -84,24 +84,27 @@
               <p class="muted small-copy">Offline family budget view (CDN totals). Stored locally on this device.</p>
             </div>
           </div>
-          <div class="family-budget-grid">
-            <label>
-              Adults
-              <input id="familyAdults" type="number" min="0" step="1" value="2" />
-            </label>
-            <label>
-              Children
-              <input id="familyChildren" type="number" min="0" step="1" value="0" />
-            </label>
-            <label class="checkbox-field family-split-toggle">
-              Cost split detail
-              <span class="checkbox-inline">
-                <input id="familySplitToggle" type="checkbox" />
-                Show per adult / per child breakdown
-              </span>
-            </label>
-          </div>
           <div id="familyBudgetSummary" class="family-budget-output"></div>
+          <details class="family-budget-settings no-print">
+            <summary>Family settings</summary>
+            <div class="family-budget-grid">
+              <label>
+                Adults
+                <input id="familyAdults" type="number" min="0" step="1" value="2" />
+              </label>
+              <label>
+                Children
+                <input id="familyChildren" type="number" min="0" step="1" value="0" />
+              </label>
+              <label class="checkbox-field family-split-toggle">
+                Cost split detail
+                <span class="checkbox-inline">
+                  <input id="familySplitToggle" type="checkbox" />
+                  Show per adult / per child breakdown
+                </span>
+              </label>
+            </div>
+          </details>
         </section>
 
         <div class="metric-grid" id="metricGrid"></div>

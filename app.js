@@ -1702,8 +1702,6 @@ function renderFamilyBudgetSummary(summary) {
 
   const f = summary.familySummary;
   const stats = [
-    ["Adults", String(f.adults)],
-    ["Children", String(f.children)],
     ["Total travelers", String(f.totalTravelers)],
     ["Per person (planned)", f.totalTravelers ? money(f.perPersonPlannedCad, "CAD") : "—"],
     ["Per person (paid)", f.totalTravelers ? money(f.perPersonPaidCad, "CAD") : "—"],
@@ -1718,6 +1716,8 @@ function renderFamilyBudgetSummary(summary) {
 
   const totalsLine = `
     <div class="family-budget-totals">
+      <span><strong>Adults:</strong> ${f.adults}</span>
+      <span><strong>Children:</strong> ${f.children}</span>
       <span><strong>Planned:</strong> ${money(f.plannedCad, "CAD")}</span>
       <span><strong>Paid:</strong> ${money(f.paidCad, "CAD")}</span>
       <span><strong>Outstanding:</strong> ${money(Math.max(0, f.plannedCad - f.paidCad), "CAD")}</span>

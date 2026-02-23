@@ -74,6 +74,14 @@ body {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
+}
+
+.support-link-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .global-save-btn {
@@ -286,6 +294,55 @@ textarea {
   background: #eff6ff;
   color: var(--brand);
   border: 1px solid #dbeafe;
+}
+
+.app-footer {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(8px);
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-footer-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.app-footer-copy strong {
+  font-size: 0.9rem;
+}
+
+.app-footer-copy span {
+  font-size: 0.78rem;
+}
+
+.app-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.footer-support-link {
+  text-decoration: none;
+  font-weight: 700;
+  color: var(--brand);
+  border: 1px solid rgba(15, 106, 191, 0.14);
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(15, 106, 191, 0.04);
+}
+
+.footer-support-link:hover,
+.footer-support-link:focus-visible {
+  background: rgba(15, 106, 191, 0.08);
 }
 
 .metric-grid {
@@ -529,9 +586,65 @@ textarea {
   box-shadow: 0 20px 50px rgba(10, 20, 35, 0.2);
 }
 
+#dashboardDayDetail .dashboard-modal-card {
+  padding-top: 14px;
+}
+
+#dashboardDayDetail .day-detail-head {
+  padding-right: 74px;
+}
+
+#dashboardDayDetailClose {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 4;
+  border-radius: 999px;
+  padding: 8px 12px;
+  box-shadow: 0 8px 16px rgba(10, 20, 35, 0.12);
+}
+
 .import-reminder-card {
   width: min(520px, 92vw);
   max-height: none;
+}
+
+.about-modal-card {
+  width: min(640px, 92vw);
+}
+
+.about-modal-content {
+  display: grid;
+  gap: 10px;
+}
+
+.about-modal-content p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.about-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  display: grid;
+  gap: 4px;
+}
+
+.about-links {
+  display: grid;
+  gap: 8px;
+}
+
+.about-links a {
+  color: var(--brand);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.about-links a:hover,
+.about-links a:focus-visible {
+  text-decoration: underline;
 }
 
 .import-reminder-actions {
@@ -540,6 +653,48 @@ textarea {
   gap: 8px;
   justify-content: flex-end;
   flex-wrap: wrap;
+}
+
+.support-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  z-index: 1080;
+  display: grid;
+  place-items: center;
+  padding: 0 12px;
+}
+
+.support-banner[hidden] {
+  display: none !important;
+}
+
+.support-banner-card {
+  width: min(720px, 100%);
+  border: 1px solid rgba(15, 106, 191, 0.14);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  box-shadow: 0 14px 28px rgba(10, 20, 35, 0.16);
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.support-banner-card p {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.support-banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .day-detail-head h4 {
@@ -1139,6 +1294,16 @@ td {
     text-align: left;
     justify-items: start;
   }
+
+  .app-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .app-footer-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 680px) {
@@ -1153,6 +1318,10 @@ td {
 
   .hero-actions .btn {
     flex: 1;
+  }
+
+  .hero-actions .support-link-btn {
+    flex: 1 1 100%;
   }
 
   .global-save-btn {
@@ -1172,6 +1341,57 @@ td {
 
   .dashboard-quick-form {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-day-detail {
+    padding:
+      calc(10px + env(safe-area-inset-top, 0px))
+      calc(10px + env(safe-area-inset-right, 0px))
+      calc(10px + env(safe-area-inset-bottom, 0px))
+      calc(10px + env(safe-area-inset-left, 0px));
+  }
+
+  .support-banner {
+    padding: 0 10px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .support-banner-card {
+    padding: 10px;
+    border-radius: 14px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .support-banner-card p {
+    font-size: 0.84rem;
+  }
+
+  .support-banner-actions {
+    width: 100%;
+  }
+
+  .support-banner-actions .btn {
+    width: 100%;
+  }
+
+  #dashboardDayDetail .dashboard-modal-card {
+    width: min(92vw, 540px);
+    max-width: calc(100vw - 20px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+    margin: 0 auto;
+    padding-top: 52px;
+    border-radius: 18px;
+  }
+
+  #dashboardDayDetail .day-detail-head {
+    padding-right: 74px;
+  }
+
+  #dashboardDayDetailClose {
+    top: 12px;
+    right: 12px;
+    position: absolute;
+    margin-left: 0;
   }
 
   .report-top {

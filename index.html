@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Vacation Trip Tracker</title>
+  <meta name="description" content="Offline travel planner, itinerary manager, and trip budget tracker. No login. Privacy-first. Static web app." />
+  <title>TravelPlanner</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -19,6 +20,14 @@
       <div class="hero-actions no-print">
         <button id="printReportBtn" class="btn btn-primary">Print / Save as PDF</button>
         <button id="resetDemoBtn" class="btn btn-secondary">Reset Demo Data</button>
+        <button id="aboutAppBtn" type="button" class="btn btn-secondary control-btn">About</button>
+        <a
+          class="btn btn-secondary control-btn support-link-btn"
+          href="https://buymeacoffee.com/ashleysnl"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="If this saved you from a spreadsheet"
+        >☕ Buy me a coffee</a>
       </div>
     </header>
 
@@ -352,6 +361,23 @@
         </div>
       </section>
     </main>
+
+    <footer class="app-footer no-print" aria-label="TravelPlanner support and links">
+      <div class="app-footer-copy">
+        <strong>TravelPlanner</strong>
+        <span class="muted">Private, local-first trip planning. No login. No tracking.</span>
+      </div>
+      <div class="app-footer-actions">
+        <a
+          class="footer-support-link"
+          href="https://buymeacoffee.com/ashleysnl"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="If this saved you from a spreadsheet"
+        >☕ Buy me a coffee</a>
+        <button id="footerAboutBtn" type="button" class="icon-btn" aria-label="About TravelPlanner">About</button>
+      </div>
+    </footer>
   </div>
 
   <button id="globalSaveBtn" class="global-save-btn no-print" type="button" aria-label="Export JSON Backup" title="Export JSON Backup">
@@ -371,6 +397,31 @@
       <div class="import-reminder-actions">
         <button id="importReminderImportBtn" type="button" class="btn btn-primary">Import Backup</button>
         <button id="importReminderDismissBtn" type="button" class="btn btn-secondary control-btn">Continue Without Import</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="aboutModal" class="dashboard-day-detail no-print" hidden>
+    <div class="dashboard-modal-backdrop" data-modal-close="about"></div>
+    <div class="dashboard-modal-card import-reminder-card about-modal-card" role="dialog" aria-modal="true" aria-labelledby="aboutModalTitle">
+      <div class="day-detail-head">
+        <div>
+          <h4 id="aboutModalTitle">About TravelPlanner</h4>
+          <p class="muted small-copy">Plan your trip, track your budget, and manage your itinerary — private, simple, and offline. No account required.</p>
+        </div>
+        <button id="aboutModalClose" type="button" class="icon-btn" aria-label="Close About">Close</button>
+      </div>
+      <div class="about-modal-content">
+        <p>TravelPlanner is a local-first trip planner that stores your data in your browser on your device. There is no login, no cloud account, and no tracking built into the app.</p>
+        <ul class="about-list">
+          <li>Works on desktop and mobile</li>
+          <li>Offline-friendly and printable</li>
+          <li>Budget + itinerary in one place</li>
+        </ul>
+        <div class="about-links">
+          <a href="https://buymeacoffee.com/ashleysnl" target="_blank" rel="noopener noreferrer">☕ Buy me a coffee</a>
+          <a href="https://github.com/ashleysnl" target="_blank" rel="noopener noreferrer">GitHub: @ashleysnl</a>
+        </div>
       </div>
     </div>
   </div>
@@ -450,6 +501,22 @@
         </label>
         <button id="dashboardQuickFormSubmit" type="submit" class="btn btn-primary add-btn">Add to Itinerary</button>
       </form>
+    </div>
+  </div>
+
+  <div id="supportBanner" class="support-banner no-print" hidden role="status" aria-live="polite">
+    <div class="support-banner-card">
+      <p id="supportBannerMessage">If TravelPlanner helped you plan faster, consider supporting it ☕</p>
+      <div class="support-banner-actions">
+        <a
+          id="supportBannerCoffeeLink"
+          class="btn btn-primary"
+          href="https://buymeacoffee.com/ashleysnl"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Buy me a coffee</a>
+        <button id="supportBannerDismissBtn" type="button" class="btn btn-secondary control-btn">Dismiss</button>
+      </div>
     </div>
   </div>
 

@@ -2,6 +2,8 @@ const STORAGE_KEY = "vacationTripTracker.v2";
 const LEGACY_STORAGE_KEYS = ["floridaVacationTracker.v1"];
 const BACKUP_VERSION = 1;
 const BASE_CATEGORIES = ["Lodging", "Transportation", "Food", "Activities", "Park Passes", "Shopping", "Misc"];
+const SUPPORT_BANNER_DISMISSED_KEY = "travelplanner_support_banner_dismissed";
+const SUPPORT_BANNER_SHOWN_KEY = "travelplanner_support_banner_shown";
 
 function makeId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -141,6 +143,10 @@ const uiState = {
   dashboardSelectedDate: null,
   dashboardDayModalOpen: false,
   importReminderOpen: false,
+  aboutModalOpen: false,
+  supportBannerQueued: false,
+  supportBannerVisible: false,
+  appReady: false,
   dashboardQuickEdit: null,
   itineraryEditId: null,
   costItemEditId: null,
@@ -158,6 +164,8 @@ const el = {
   costItemFormSubmit: document.getElementById("costItemFormSubmit"),
   printReportBtn: document.getElementById("printReportBtn"),
   resetDemoBtn: document.getElementById("resetDemoBtn"),
+  aboutAppBtn: document.getElementById("aboutAppBtn"),
+  footerAboutBtn: document.getElementById("footerAboutBtn"),
   exportJsonBtn: document.getElementById("exportJsonBtn"),
   importJsonBtn: document.getElementById("importJsonBtn"),
   importJsonFile: document.getElementById("importJsonFile"),
@@ -166,6 +174,11 @@ const el = {
   importReminderImportBtn: document.getElementById("importReminderImportBtn"),
   importReminderDismissBtn: document.getElementById("importReminderDismissBtn"),
   importReminderLastUsed: document.getElementById("importReminderLastUsed"),
+  aboutModal: document.getElementById("aboutModal"),
+  aboutModalClose: document.getElementById("aboutModalClose"),
+  supportBanner: document.getElementById("supportBanner"),
+  supportBannerDismissBtn: document.getElementById("supportBannerDismissBtn"),
+  supportBannerCoffeeLink: document.getElementById("supportBannerCoffeeLink"),
   tabButtons: Array.from(document.querySelectorAll(".tab-btn")),
   tabPanels: Array.from(document.querySelectorAll(".tab-panel")),
   metricGrid: document.getElementById("metricGrid"),
@@ -272,6 +285,9 @@ function saveState(markDirty = true) {
     state.meta.backup.lastDataChangeAt = new Date().toISOString();
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (markDirty) {
+    maybeQueueSupportBannerAfterMeaningfulAction();
+  }
 }
 
 function normalizeImportedState(candidate) {
@@ -427,6 +443,100 @@ function renderBackupUi() {
     const title = dirty ? "Export JSON Backup (changes since last backup)" : "Export JSON Backup";
     el.globalSaveBtn.title = title;
     el.globalSaveBtn.setAttribute("aria-label", title);
+  }
+}
+
+function isSupportBannerDismissed() {
+  try {
+    return localStorage.getItem(SUPPORT_BANNER_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function hasSupportBannerShown() {
+  try {
+    return localStorage.getItem(SUPPORT_BANNER_SHOWN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markSupportBannerShown() {
+  try {
+    localStorage.setItem(SUPPORT_BANNER_SHOWN_KEY, "1");
+  } catch {
+    // Ignore storage errors; banner will simply be less persistent.
+  }
+}
+
+function markSupportBannerDismissed() {
+  try {
+    localStorage.setItem(SUPPORT_BANNER_DISMISSED_KEY, "1");
+  } catch {
+    // Ignore storage errors; banner will simply be less persistent.
+  }
+}
+
+function maybeQueueSupportBannerAfterMeaningfulAction() {
+  if (!uiState.appReady) return;
+  if (isSupportBannerDismissed() || hasSupportBannerShown()) return;
+  uiState.supportBannerQueued = true;
+  renderSupportUi();
+}
+
+function renderSupportUi() {
+  if (!el.supportBanner) return;
+  const blockedByModal = uiState.importReminderOpen || uiState.dashboardDayModalOpen || uiState.aboutModalOpen;
+  const shouldShow =
+    uiState.appReady &&
+    uiState.supportBannerQueued &&
+    !blockedByModal &&
+    !isSupportBannerDismissed() &&
+    !hasSupportBannerShown();
+
+  el.supportBanner.hidden = !shouldShow;
+  uiState.supportBannerVisible = shouldShow;
+
+  if (shouldShow) {
+    markSupportBannerShown();
+    uiState.supportBannerQueued = false;
+  }
+}
+
+function dismissSupportBanner({ permanent = true } = {}) {
+  if (permanent) {
+    markSupportBannerDismissed();
+  }
+  uiState.supportBannerQueued = false;
+  uiState.supportBannerVisible = false;
+  if (el.supportBanner) el.supportBanner.hidden = true;
+}
+
+function syncAboutModal() {
+  if (!el.aboutModal) return;
+  el.aboutModal.hidden = !uiState.aboutModalOpen;
+}
+
+function openAboutModal() {
+  uiState.aboutModalOpen = true;
+  syncAboutModal();
+  renderSupportUi();
+}
+
+function closeAboutModal() {
+  uiState.aboutModalOpen = false;
+  syncAboutModal();
+  renderSupportUi();
+}
+
+function handleAboutModalClick(event) {
+  if (event.target === el.aboutModal || event.target.dataset.modalClose === "about") {
+    closeAboutModal();
+    return;
+  }
+  if (event.target.closest("#aboutModalClose")) {
+    closeAboutModal();
   }
 }
 
@@ -1283,6 +1393,8 @@ function render() {
   renderReport(summary);
   renderBackupUi();
   syncImportReminderModal();
+  syncAboutModal();
+  renderSupportUi();
 }
 
 function updateSettingsFromInputs() {
@@ -1590,11 +1702,13 @@ function syncImportReminderModal() {
 function openImportReminder() {
   uiState.importReminderOpen = true;
   syncImportReminderModal();
+  renderSupportUi();
 }
 
 function closeImportReminder() {
   uiState.importReminderOpen = false;
   syncImportReminderModal();
+  renderSupportUi();
 }
 
 function showImportReminderOnLoad() {
@@ -1647,6 +1761,10 @@ function handleGlobalKeydown(event) {
   if (event.key !== "Escape") return;
   if (uiState.importReminderOpen) {
     closeImportReminder();
+    return;
+  }
+  if (uiState.aboutModalOpen) {
+    closeAboutModal();
     return;
   }
   if (uiState.dashboardDayModalOpen) {
@@ -1721,6 +1839,8 @@ el.dashboardItinerary.addEventListener("keydown", handleDashboardTimelineKeydown
 el.dashboardDayDetail.addEventListener("click", handleDashboardDayModalClick);
 el.printReportBtn.addEventListener("click", () => window.print());
 el.resetDemoBtn.addEventListener("click", resetDemoData);
+el.aboutAppBtn?.addEventListener("click", openAboutModal);
+el.footerAboutBtn?.addEventListener("click", openAboutModal);
 el.exportJsonBtn.addEventListener("click", exportJsonBackup);
 el.importJsonBtn.addEventListener("click", openImportPicker);
 el.importJsonFile.addEventListener("change", importJsonBackup);
@@ -1731,6 +1851,10 @@ el.importReminderImportBtn?.addEventListener("click", () => {
   openImportPicker();
 });
 el.importReminderDismissBtn?.addEventListener("click", closeImportReminder);
+el.aboutModal?.addEventListener("click", handleAboutModalClick);
+el.aboutModalClose?.addEventListener("click", closeAboutModal);
+el.supportBannerDismissBtn?.addEventListener("click", () => dismissSupportBanner({ permanent: true }));
+el.supportBannerCoffeeLink?.addEventListener("click", () => dismissSupportBanner({ permanent: true }));
 el.dashboardQuickActivityForm.addEventListener("submit", addDashboardQuickActivity);
 el.dashboardQuickFormCancelEdit.addEventListener("click", cancelDashboardQuickEdit);
 document.addEventListener("keydown", handleGlobalKeydown);
@@ -1738,5 +1862,6 @@ el.tabButtons.forEach((button) => {
   button.addEventListener("click", () => switchTab(button.dataset.tabTarget));
 });
 
+uiState.appReady = true;
 render();
 showImportReminderOnLoad();

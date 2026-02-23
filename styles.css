@@ -605,6 +605,11 @@ textarea {
   align-items: end;
 }
 
+.dashboard-quick-form > label,
+.activity-form > label {
+  min-width: 0;
+}
+
 .dashboard-quick-form-header {
   grid-column: 1 / -1;
   display: flex;

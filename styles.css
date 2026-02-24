@@ -1851,6 +1851,196 @@ textarea {
   align-content: initial;
 }
 
+.cost-hub-summary-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fff, #fbfdff);
+  padding: 10px;
+}
+
+.cost-hub-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cost-hub-stat {
+  border: 1px solid #edf2fb;
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px;
+  display: grid;
+  gap: 3px;
+}
+
+.cost-hub-stat .label {
+  color: var(--muted);
+  font-size: 0.75rem;
+  margin: 0;
+}
+
+.cost-hub-stat strong {
+  font-size: 0.95rem;
+  line-height: 1.1;
+}
+
+.cost-hub-group {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.cost-hub-group-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cost-hub-group-head h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.cost-hub-group-head .small-copy {
+  margin: 2px 0 0;
+}
+
+.cost-hub-count {
+  border: 1px solid #e8eef9;
+  background: #f8fbff;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.cost-hub-group-body {
+  display: grid;
+  gap: 8px;
+}
+
+.cost-hub-row {
+  display: grid;
+  gap: 6px;
+}
+
+.cost-hub-item {
+  border: 1px solid #e8edf5;
+  border-radius: 12px;
+  background: #fbfdff;
+}
+
+.cost-hub-item[open] {
+  background: #fff;
+}
+
+.cost-hub-summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.cost-hub-summary::-webkit-details-marker {
+  display: none;
+}
+
+.cost-hub-title-wrap {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cost-hub-title {
+  font-weight: 700;
+  min-width: 0;
+}
+
+.cost-hub-sub {
+  font-size: 0.78rem;
+}
+
+.cost-hub-amounts {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  text-align: right;
+}
+
+.cost-hub-forecast {
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.cost-hub-paid {
+  font-size: 0.76rem;
+}
+
+.cost-hub-body {
+  border-top: 1px solid #edf2fb;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.cost-hub-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.8rem;
+}
+
+.cost-hub-meta span {
+  border: 1px solid #edf2fb;
+  background: #f8fbff;
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.cost-hub-notes {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.cost-hub-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cost-hub-detail-grid > div {
+  border: 1px solid #edf2fb;
+  border-radius: 10px;
+  background: #fbfdff;
+  padding: 8px;
+  display: grid;
+  gap: 2px;
+}
+
+.cost-hub-detail-grid strong {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.cost-hub-detail-grid span {
+  font-size: 0.84rem;
+}
+
+.cost-hub-actions {
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  justify-content: flex-start;
+  align-content: initial;
+}
+
 .itinerary-empty {
   border: 1px dashed #dbe6f5;
   border-radius: 12px;
@@ -2471,6 +2661,35 @@ td {
   }
 
   .itinerary-plan-actions {
+    grid-auto-flow: row;
+    grid-auto-columns: initial;
+  }
+
+  .cost-hub-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cost-hub-group-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cost-hub-summary {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 6px;
+  }
+
+  .cost-hub-amounts {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .cost-hub-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cost-hub-actions {
     grid-auto-flow: row;
     grid-auto-columns: initial;
   }

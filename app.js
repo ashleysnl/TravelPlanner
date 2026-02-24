@@ -1513,6 +1513,63 @@ function mountCostFormInline() {
   form.hidden = false;
 }
 
+function getCostHubGroups(summary) {
+  const itineraryEntries = [];
+  const generalEntries = [];
+
+  (summary.activities || []).forEach((item) => {
+    itineraryEntries.push({
+      kind: "activity",
+      id: item.id,
+      title: item.title,
+      category: item.category,
+      currency: normalizeCurrency(item.currency),
+      plannedUsd: Number(item.plannedUsd) || 0,
+      paidUsd: Number(item.paidUsd) || 0,
+      status: item.status || "Planned",
+      date: item.date || "",
+      time: item.time || "",
+      location: item.location || "",
+      notes: item.notes || "",
+      sourceLabel: "Itinerary activity",
+    });
+  });
+
+  (summary.costItems || []).forEach((item) => {
+    const base = {
+      kind: "costItem",
+      id: item.id,
+      title: item.title,
+      category: item.category,
+      currency: normalizeCurrency(item.currency),
+      plannedUsd: Number(item.plannedUsd) || 0,
+      paidUsd: Number(item.paidUsd) || 0,
+      status: item.includeInItinerary ? item.itineraryStatus || "Planned" : "Cost",
+      date: item.includeInItinerary ? item.itineraryDate || "" : "",
+      time: item.includeInItinerary ? item.itineraryTime || "" : "",
+      location: item.includeInItinerary ? item.itineraryLocation || "" : "",
+      notes: item.notes || "",
+      sourceLabel: item.includeInItinerary ? "Itinerary-linked cost" : "General cost",
+      includeInItinerary: Boolean(item.includeInItinerary),
+    };
+    if (item.includeInItinerary) {
+      itineraryEntries.push(base);
+    } else {
+      generalEntries.push(base);
+    }
+  });
+
+  const sortBySchedule = (a, b) => {
+    const aKey = `${a.date || "9999-12-31"}T${a.time || "23:59"} ${a.title || ""}`;
+    const bKey = `${b.date || "9999-12-31"}T${b.time || "23:59"} ${b.title || ""}`;
+    return aKey.localeCompare(bKey);
+  };
+  itineraryEntries.sort(sortBySchedule);
+  generalEntries.sort((a, b) => `${a.category || ""} ${a.title || ""}`.localeCompare(`${b.category || ""} ${b.title || ""}`));
+
+  return { itineraryEntries, generalEntries };
+}
+
 function renderCostsList(summary) {
   if (!el.costsComposer || !el.costsList) return;
   el.costsComposer.innerHTML = `
@@ -1525,47 +1582,107 @@ function renderCostsList(summary) {
     </div>
   `;
 
-  el.costsList.innerHTML = summary.costItems.length
-    ? summary.costItems
-        .map((item) => {
-          const itineraryMeta = item.includeInItinerary
-            ? `${shortDate(item.itineraryDate)}${item.itineraryTime ? ` • ${item.itineraryTime}` : ""}${item.itineraryLocation ? ` • ${item.itineraryLocation}` : ""}`
-            : "Not shown on itinerary";
-          return `
-            <div class="itinerary-row">
-              <div class="itinerary-card">
-                <div class="itinerary-card-main">
-                  <div class="itinerary-card-head">
-                    <div class="itinerary-card-title-wrap">
-                      <span class="itinerary-card-date-title">${item.includeInItinerary ? "Itinerary-linked cost" : "Additional cost item"}</span>
-                      <strong>${escapeHtml(item.title)}</strong>
-                    </div>
-                    <span class="status-pill status-${item.itineraryStatus || "Planned"}">${item.includeInItinerary ? (item.itineraryStatus || "Planned") : "Cost"}</span>
-                  </div>
-                  <div class="itinerary-card-meta">
-                    <span>${escapeHtml(item.category)}</span>
-                    <span>${normalizeCurrency(item.currency)}</span>
-                    <span>${item.includeInItinerary ? "On Itinerary" : "Not on Itinerary"}</span>
-                  </div>
-                  <div class="itinerary-card-sub muted">${escapeHtml(itineraryMeta)}</div>
-                  ${item.notes ? `<div class="itinerary-card-notes muted">${escapeHtml(item.notes)}</div>` : ""}
-                  <div class="itinerary-card-costs">
-                    <div><span class="muted">Forecast</span> ${formatEnteredMoney(item.plannedUsd, item.currency)} <span class="muted">(${money(amountToCad(item.plannedUsd, item.currency), "CAD")})</span></div>
-                    <div><span class="muted">Paid</span> ${formatEnteredMoney(item.paidUsd, item.currency)} <span class="muted">(${money(amountToCad(item.paidUsd, item.currency), "CAD")})</span></div>
-                  </div>
-                </div>
-                <div class="itinerary-card-actions">
-                  <button class="icon-btn" data-action="costEditInline" data-id="${item.id}">Edit</button>
-                  <button class="icon-btn" data-action="markCostItemPaid" data-id="${item.id}">Mark Paid</button>
-                  <button class="icon-btn danger" data-action="deleteCostItem" data-id="${item.id}">Delete</button>
-                </div>
-              </div>
-              <div class="day-detail-inline-slot" data-inline-slot="edit" data-item-id="${item.id}"></div>
+  const groups = getCostHubGroups(summary);
+  const totalItems = groups.itineraryEntries.length + groups.generalEntries.length;
+  const outstandingCad = Math.max(0, summary.plannedCad - summary.paidCad);
+
+  const renderCostHubEntry = (entry) => {
+    const isCostItem = entry.kind === "costItem";
+    const isEditing = isCostItem && uiState.costFormPlacement?.type === "edit" && uiState.costItemEditId === entry.id;
+    const scheduleMeta = entry.date
+      ? `${shortDate(entry.date)}${entry.time ? ` • ${entry.time}` : ""}${entry.location ? ` • ${entry.location}` : ""}`
+      : entry.location || "No date/time assigned";
+    return `
+      <div class="cost-hub-row">
+        <details class="cost-hub-item"${isEditing ? " open" : ""}>
+          <summary class="cost-hub-summary">
+            <span class="cost-hub-title-wrap">
+              <span class="cost-hub-title">${escapeHtml(entry.title)}</span>
+              <span class="cost-hub-sub muted">${escapeHtml(entry.sourceLabel)} • ${escapeHtml(entry.category || "Misc")}</span>
+            </span>
+            <span class="cost-hub-amounts">
+              <span class="cost-hub-forecast">${moneyDisplayFromCad(amountToCad(entry.plannedUsd, entry.currency))}</span>
+              <span class="cost-hub-paid muted">${moneyDisplayFromCad(amountToCad(entry.paidUsd, entry.currency))} paid</span>
+            </span>
+          </summary>
+          <div class="cost-hub-body">
+            <div class="cost-hub-meta muted">
+              <span>${escapeHtml(scheduleMeta)}</span>
+              <span>${normalizeCurrency(entry.currency)}</span>
+              <span>${escapeHtml(entry.status || "Planned")}</span>
             </div>
-          `;
-        })
-        .join("")
-    : `<div class="itinerary-empty muted">No cost items yet. Add one to track non-itinerary expenses and shared trip costs.</div>`;
+            ${entry.notes ? `<p class="cost-hub-notes muted">${escapeHtml(entry.notes)}</p>` : ""}
+            <div class="cost-hub-detail-grid">
+              <div><strong>Forecast</strong><span>${formatEnteredMoney(entry.plannedUsd, entry.currency)}</span></div>
+              <div><strong>Paid</strong><span>${formatEnteredMoney(entry.paidUsd, entry.currency)}</span></div>
+              <div><strong>Forecast (CAD)</strong><span>${money(amountToCad(entry.plannedUsd, entry.currency), "CAD")}</span></div>
+              <div><strong>Paid (CAD)</strong><span>${money(amountToCad(entry.paidUsd, entry.currency), "CAD")}</span></div>
+            </div>
+            <div class="itinerary-card-actions cost-hub-actions">
+              ${
+                isCostItem
+                  ? `
+                    <button class="icon-btn" data-action="costEditInline" data-id="${entry.id}">Edit</button>
+                    <button class="icon-btn" data-action="markCostItemPaid" data-id="${entry.id}">Mark Paid</button>
+                    <button class="icon-btn danger" data-action="deleteCostItem" data-id="${entry.id}">Delete</button>
+                  `
+                  : `
+                    <button class="icon-btn" data-action="costHubEditActivity" data-id="${entry.id}">Edit in Itinerary</button>
+                    <button class="icon-btn" data-action="markPaid" data-id="${entry.id}">Mark Paid</button>
+                    <button class="icon-btn danger" data-action="delete" data-id="${entry.id}">Delete</button>
+                  `
+              }
+            </div>
+          </div>
+        </details>
+        ${isCostItem ? `<div class="day-detail-inline-slot" data-inline-slot="edit" data-item-id="${entry.id}"></div>` : ""}
+      </div>
+    `;
+  };
+
+  const renderGroupSection = ({ title, subtitle, entries, emptyText }) => `
+    <section class="cost-hub-group">
+      <div class="cost-hub-group-head">
+        <div>
+          <h4>${escapeHtml(title)}</h4>
+          <p class="muted small-copy">${escapeHtml(subtitle)}</p>
+        </div>
+        <span class="cost-hub-count">${entries.length} item${entries.length === 1 ? "" : "s"}</span>
+      </div>
+      <div class="cost-hub-group-body">
+        ${entries.length ? entries.map(renderCostHubEntry).join("") : `<div class="itinerary-day-empty muted">${escapeHtml(emptyText)}</div>`}
+      </div>
+    </section>
+  `;
+
+  el.costsList.innerHTML = totalItems
+    ? `
+      <section class="cost-hub-summary-card">
+        <div class="cost-hub-summary-grid">
+          <div class="cost-hub-stat"><span class="label">Forecast</span><strong>${moneyDisplayRoundedFromCad(summary.plannedCad)}</strong></div>
+          <div class="cost-hub-stat"><span class="label">Paid</span><strong>${moneyDisplayRoundedFromCad(summary.paidCad)}</strong></div>
+          <div class="cost-hub-stat"><span class="label">Left to pay</span><strong>${moneyDisplayRoundedFromCad(outstandingCad)}</strong></div>
+          <div class="cost-hub-stat"><span class="label">Tracked items</span><strong>${totalItems}</strong></div>
+        </div>
+      </section>
+      ${renderGroupSection({
+        title: "Itinerary & Active Costs",
+        subtitle: "Scheduled activities and itinerary-linked costs",
+        entries: groups.itineraryEntries,
+        emptyText: "No itinerary-linked costs yet.",
+      })}
+      ${renderGroupSection({
+        title: "General Costs",
+        subtitle: "Shared trip costs not attached to a day",
+        entries: groups.generalEntries,
+        emptyText: "No general costs yet. Add one to track shared expenses.",
+      })}
+    `
+    : renderActionEmptyState({
+        title: "No cost items yet",
+        body: "Add your first cost to start tracking forecast and paid totals.",
+        actionPrefix: "budgetEmpty",
+      });
 
   if (uiState.costFormPlacement?.type === "edit" && uiState.costItemEditId) {
     const active = summary.costItems.find((item) => item.id === uiState.costItemEditId);
@@ -2760,8 +2877,23 @@ function handleCostsListClick(event) {
     return;
   }
 
+  if (action === "costHubEditActivity") {
+    const item = state.activities.find((a) => a.id === id);
+    if (!item) return;
+    setActivityFormEditMode(item);
+    switchTab("itinerary");
+    render();
+    requestAnimationFrame(() => el.activityInputs.title?.focus());
+    return;
+  }
+
   if (action === "markCostItemPaid" || action === "deleteCostItem") {
     handleCostItemsTableClick(event);
+    return;
+  }
+
+  if (action === "markPaid" || action === "delete") {
+    handleTableClick(event);
   }
 }
 

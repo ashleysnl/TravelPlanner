@@ -3082,10 +3082,7 @@ td {
   }
 
   .trip-snapshot {
-    margin-top: 0;
-    break-inside: avoid;
-    border-radius: 0;
-    box-shadow: none;
+    display: none !important;
   }
 
   .no-print {
@@ -3097,16 +3094,24 @@ td {
   }
 
   .dashboard-panel {
+    display: none !important;
+  }
+
+  .dashboard-panel[hidden] {
+    display: none !important;
+  }
+
+  .report-panel {
     display: block !important;
     border: 0;
     padding: 0;
   }
 
-  .dashboard-panel[hidden] {
+  .report-panel[hidden] {
     display: block !important;
   }
 
-  .dashboard-panel .panel-header p,
+  .report-panel .panel-header p,
   .dashboard-timeline .timeline-unscheduled {
     margin-bottom: 0;
   }

@@ -1232,6 +1232,55 @@ function mountItineraryFormInline() {
   form.hidden = false;
 }
 
+function getItineraryPlannerDays(summary) {
+  const byDate = new Map();
+  (summary.activities || []).forEach((item) => {
+    if (!item.date) return;
+    if (!byDate.has(item.date)) byDate.set(item.date, []);
+    byDate.get(item.date).push(item);
+  });
+
+  const sortByTimeThenTitle = (a, b) => `${a.time || ""} ${a.title || ""}`.localeCompare(`${b.time || ""} ${b.title || ""}`);
+  byDate.forEach((items) => items.sort(sortByTimeThenTitle));
+
+  const tripStart = parseDateOnly(state.settings.startDate);
+  const tripEnd = parseDateOnly(state.settings.endDate);
+  const hasTripRange = Boolean(tripStart && tripEnd && tripEnd >= tripStart);
+  const dayFmt = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const fullFmt = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" });
+
+  const days = [];
+  if (hasTripRange) {
+    for (let d = new Date(tripStart); d <= tripEnd; d = addDays(d, 1)) {
+      const key = formatDateInput(d);
+      days.push({
+        key,
+        shortLabel: dayFmt.format(d),
+        fullLabel: fullFmt.format(d),
+        items: byDate.get(key) || [],
+      });
+    }
+  } else {
+    Array.from(byDate.keys())
+      .sort()
+      .forEach((key) => {
+        const d = parseDateOnly(key);
+        days.push({
+          key,
+          shortLabel: d ? dayFmt.format(d) : key,
+          fullLabel: d ? fullFmt.format(d) : key,
+          items: byDate.get(key) || [],
+        });
+      });
+  }
+
+  const unscheduled = (summary.activities || [])
+    .filter((item) => !item.date)
+    .sort(sortByTimeThenTitle);
+
+  return { days, unscheduled, hasTripRange };
+}
+
 function renderItineraryList(summary) {
   if (!el.itineraryComposer || !el.itineraryList) return;
 
@@ -1245,42 +1294,94 @@ function renderItineraryList(summary) {
     </div>
   `;
 
-  el.itineraryList.innerHTML = summary.activities.length
-    ? summary.activities
-        .map(
-          (item) => `
-            <div class="itinerary-row">
-              <div class="itinerary-card">
-                <div class="itinerary-card-main">
-                  <div class="itinerary-card-head">
-                    <div class="itinerary-card-title-wrap">
-                      <span class="itinerary-card-date-title">${shortDate(item.date)} • ${item.time || "--:--"}</span>
-                      <strong>${escapeHtml(item.title)}</strong>
-                    </div>
-                    <span class="status-pill status-${item.status}">${item.status}</span>
-                  </div>
-                  <div class="itinerary-card-meta">
-                    <span>${escapeHtml(item.category)}</span>
-                    <span>${normalizeCurrency(item.currency)}</span>
-                  </div>
-                  <div class="itinerary-card-sub muted">${escapeHtml(item.location || "Location TBD")}</div>
-                  ${item.notes ? `<div class="itinerary-card-notes muted">${escapeHtml(item.notes)}</div>` : ""}
-                  <div class="itinerary-card-costs">
-                    <div><span class="muted">Forecast</span> ${formatEnteredMoney(item.plannedUsd, item.currency)} <span class="muted">(${money(amountToCad(item.plannedUsd, item.currency), "CAD")})</span></div>
-                    <div><span class="muted">Paid</span> ${formatEnteredMoney(item.paidUsd, item.currency)} <span class="muted">(${money(amountToCad(item.paidUsd, item.currency), "CAD")})</span></div>
-                  </div>
-                </div>
-                <div class="itinerary-card-actions">
-                  <button class="icon-btn" data-action="itineraryEditInline" data-id="${item.id}">Edit</button>
-                  <button class="icon-btn" data-action="markPaid" data-id="${item.id}">Mark Paid</button>
-                  <button class="icon-btn danger" data-action="delete" data-id="${item.id}">Delete</button>
-                </div>
-              </div>
-              <div class="day-detail-inline-slot" data-inline-slot="edit" data-item-id="${item.id}"></div>
+  const planner = getItineraryPlannerDays(summary);
+  const hasPlannerContent = planner.days.length || planner.unscheduled.length;
+
+  const renderPlannerItem = (item) => {
+    const isEditing = uiState.itineraryFormPlacement?.type === "edit" && uiState.itineraryEditId === item.id;
+    return `
+      <div class="itinerary-row">
+        <details class="itinerary-plan-item"${isEditing ? " open" : ""}>
+          <summary class="itinerary-plan-summary">
+            <span class="itinerary-plan-time">${escapeHtml(item.time || "--:--")}</span>
+            <span class="itinerary-plan-title">${escapeHtml(item.title)}</span>
+            <span class="itinerary-plan-status status-pill status-${item.status}">${item.status}</span>
+          </summary>
+          <div class="itinerary-plan-body">
+            <div class="itinerary-plan-meta muted">
+              <span>${escapeHtml(item.location || "Location TBD")}</span>
+              <span>${escapeHtml(item.category)}</span>
+              <span>${normalizeCurrency(item.currency)}</span>
             </div>
-          `
-        )
-        .join("")
+            ${item.notes ? `<p class="itinerary-plan-notes muted">${escapeHtml(item.notes)}</p>` : ""}
+            <div class="itinerary-plan-costs">
+              <span><strong>Forecast:</strong> ${formatEnteredMoney(item.plannedUsd, item.currency)}</span>
+              <span class="muted">(${money(amountToCad(item.plannedUsd, item.currency), "CAD")})</span>
+              <span><strong>Paid:</strong> ${formatEnteredMoney(item.paidUsd, item.currency)}</span>
+              <span class="muted">(${money(amountToCad(item.paidUsd, item.currency), "CAD")})</span>
+            </div>
+            <div class="itinerary-card-actions itinerary-plan-actions">
+              <button class="icon-btn" data-action="itineraryEditInline" data-id="${item.id}">Edit</button>
+              <button class="icon-btn" data-action="markPaid" data-id="${item.id}">Mark Paid</button>
+              <button class="icon-btn danger" data-action="delete" data-id="${item.id}">Delete</button>
+            </div>
+          </div>
+        </details>
+        <div class="day-detail-inline-slot" data-inline-slot="edit" data-item-id="${item.id}"></div>
+      </div>
+    `;
+  };
+
+  const dayBlocks = planner.days
+    .map(
+      (day) => `
+        <section class="itinerary-day-block">
+          <div class="itinerary-day-head">
+            <div>
+              <h4>${escapeHtml(day.shortLabel)}</h4>
+              <p class="muted small-copy">${escapeHtml(day.fullLabel)}</p>
+            </div>
+            <span class="itinerary-day-count">${day.items.length} item${day.items.length === 1 ? "" : "s"}</span>
+          </div>
+          <div class="itinerary-day-body">
+            ${
+              day.items.length
+                ? day.items.map(renderPlannerItem).join("")
+                : `<div class="itinerary-day-empty muted">No activities planned yet.</div>`
+            }
+          </div>
+        </section>
+      `
+    )
+    .join("");
+
+  const unscheduledBlock = planner.unscheduled.length
+    ? `
+      <section class="itinerary-day-block itinerary-day-block-unscheduled">
+        <div class="itinerary-day-head">
+          <div>
+            <h4>Unscheduled</h4>
+            <p class="muted small-copy">Items without a date</p>
+          </div>
+          <span class="itinerary-day-count">${planner.unscheduled.length} item${planner.unscheduled.length === 1 ? "" : "s"}</span>
+        </div>
+        <div class="itinerary-day-body">
+          ${planner.unscheduled.map(renderPlannerItem).join("")}
+        </div>
+      </section>
+    `
+    : "";
+
+  el.itineraryList.innerHTML = hasPlannerContent
+    ? `
+      ${
+        planner.hasTripRange
+          ? ""
+          : `<p class="muted small-copy itinerary-planner-note">Set trip start and end dates in Settings to view every day of your trip.</p>`
+      }
+      ${dayBlocks}
+      ${unscheduledBlock}
+    `
     : renderActionEmptyState({
         title: "No itinerary items yet",
         body: "Add your first activity to start planning your trip timeline.",

@@ -535,6 +535,7 @@ body {
 
 .control-panel .stack-form .settings-half-field {
   min-width: 0;
+  overflow: hidden;
 }
 
 .settings-inline-grid {
@@ -597,6 +598,15 @@ body {
 
 .control-panel .stack-form input[type="date"] {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  inline-size: 100%;
+  min-inline-size: 0;
+  font-size: 0.95rem;
+}
+
+.control-panel .stack-form input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
 }
 
 label {

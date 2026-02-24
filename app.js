@@ -2630,15 +2630,17 @@ function renderReport(summary) {
                     <strong>${escapeHtml(day.shortLabel)}</strong>
                     <span>${day.items.length}</span>
                   </div>
-                  <div class="report-calendar-day-body">
+                  <div class="report-calendar-day-body ${day.items.length ? "has-items" : "is-empty"}">
                     ${
                       day.items.length
                         ? day.items
                             .map(
                               (item) => `
                                 <div class="report-calendar-item">
-                                  <span class="time">${escapeHtml(item.time || "--:--")}</span>
-                                  <span class="title">${escapeHtml(item.title)}</span>
+                                  <span class="report-calendar-pill">
+                                    <span class="time">${escapeHtml(item.time || "--:--")}</span>
+                                    <span class="title">${escapeHtml(item.title)}</span>
+                                  </span>
                                 </div>
                               `
                             )
@@ -2658,13 +2660,15 @@ function renderReport(summary) {
                     <strong>Unscheduled</strong>
                     <span>${unscheduled.length}</span>
                   </div>
-                  <div class="report-calendar-day-body">
+                  <div class="report-calendar-day-body has-items">
                     ${unscheduled
                       .map(
                         (item) => `
                           <div class="report-calendar-item">
-                            <span class="time">--:--</span>
-                            <span class="title">${escapeHtml(item.title)}</span>
+                            <span class="report-calendar-pill">
+                              <span class="time">--:--</span>
+                              <span class="title">${escapeHtml(item.title)}</span>
+                            </span>
                           </div>
                         `
                       )

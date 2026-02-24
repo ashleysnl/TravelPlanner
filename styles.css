@@ -2408,7 +2408,7 @@ td {
 
 .report-itinerary-calendar {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -2416,8 +2416,9 @@ td {
   border: 1px solid #e8eef8;
   border-radius: 12px;
   background: #ffffff;
-  padding: 10px;
+  padding: 8px;
   break-inside: avoid;
+  min-width: 0;
 }
 
 .report-calendar-day-head {
@@ -2429,31 +2430,64 @@ td {
 }
 
 .report-calendar-day-head strong {
-  font-size: 0.82rem;
+  font-size: 0.78rem;
+  min-width: 0;
 }
 
 .report-calendar-day-head span {
   color: #6b7f99;
-  font-size: 0.74rem;
+  font-size: 0.7rem;
 }
 
 .report-calendar-day-body {
   display: grid;
-  gap: 5px;
-  font-size: 0.76rem;
+  gap: 4px;
+  font-size: 0.72rem;
 }
 
 .report-calendar-item {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 6px;
-  align-items: baseline;
+  min-width: 0;
 }
 
-.report-calendar-item .time {
+.report-calendar-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #d8e6fb;
+  border-radius: 999px;
+  background: #f6faff;
+  padding: 4px 7px;
+  line-height: 1.15;
+}
+
+.report-calendar-pill .time {
   color: var(--brand);
   font-weight: 700;
   white-space: nowrap;
+  font-size: 0.68rem;
+}
+
+.report-calendar-pill .title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #1f2d3d;
+}
+
+.report-calendar-day-body.is-empty .muted {
+  font-size: 0.7rem;
+}
+
+.report-calendar-day-unscheduled {
+  grid-column: 1 / -1;
+}
+
+.report-calendar-day-unscheduled .report-calendar-day-body {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 6px;
 }
 
 .report-footer-line {
@@ -2640,7 +2674,7 @@ td {
   }
 
   .report-itinerary-calendar {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .report-charts-grid {
@@ -2653,7 +2687,7 @@ td {
   }
 
   .report-itinerary-calendar {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .dashboard-trip-header {
@@ -3129,7 +3163,49 @@ td {
   }
 
   .report-itinerary-calendar {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .report-calendar-day {
+    padding: 6px;
+    border-radius: 10px;
+  }
+
+  .report-calendar-day-head {
+    margin-bottom: 4px;
+  }
+
+  .report-calendar-day-head strong {
+    font-size: 0.66rem;
+  }
+
+  .report-calendar-day-head span {
+    font-size: 0.62rem;
+  }
+
+  .report-calendar-day-body {
+    gap: 3px;
+    font-size: 0.64rem;
+  }
+
+  .report-calendar-pill {
+    padding: 3px 5px;
+    gap: 4px;
+    border-radius: 999px;
+  }
+
+  .report-calendar-pill .time {
+    font-size: 0.6rem;
+  }
+
+  .report-calendar-pill .title {
+    font-size: 0.62rem;
+  }
+
+  .report-section-detailed-itinerary {
+    break-before: page;
+    page-break-before: always;
   }
 
   .metric-grid {

@@ -2638,7 +2638,6 @@ function renderReport(summary) {
                               (item) => `
                                 <div class="report-calendar-item">
                                   <span class="report-calendar-pill">
-                                    <span class="time">${escapeHtml(item.time || "--:--")}</span>
                                     <span class="title">${escapeHtml(item.title)}</span>
                                   </span>
                                 </div>
@@ -2666,7 +2665,6 @@ function renderReport(summary) {
                         (item) => `
                           <div class="report-calendar-item">
                             <span class="report-calendar-pill">
-                              <span class="time">--:--</span>
                               <span class="title">${escapeHtml(item.title)}</span>
                             </span>
                           </div>
@@ -2748,27 +2746,58 @@ function renderReport(summary) {
     </div>
   `;
 
-  el.reportTimeline.innerHTML = summary.itineraryEntries.length
-    ? summary.itineraryEntries
-        .map(
-          (item) => `
-            <div class="timeline-item">
-              <div class="timeline-date">${item.date ? dateLabel(item.date, item.time) : "Unscheduled"}</div>
-              <div class="timeline-main">
-                <h5>${escapeHtml(item.title)}</h5>
-                <p>${escapeHtml(item.location || "Location TBD")} • ${escapeHtml(item.category)} • ${escapeHtml(item.status)}${item.source === "costItem" ? " • Cost Item" : ""}</p>
-                ${item.notes ? `<p class="muted">${escapeHtml(item.notes)}</p>` : ""}
-              </div>
-              <div class="timeline-cost">
-                <strong>Forecast ${formatEnteredMoney(item.plannedUsd, item.currency)}</strong>
-                <span>Paid ${formatEnteredMoney(item.paidUsd, item.currency)}</span>
-                <span class="muted">${money(amountToCad(item.plannedUsd, item.currency), "CAD")} planned</span>
-              </div>
+  if (!summary.itineraryEntries.length) {
+    el.reportTimeline.innerHTML = `<p class="muted">No itinerary items yet.</p>`;
+  } else {
+    const grouped = [];
+    for (const item of summary.itineraryEntries) {
+      const key = item.date || "__unscheduled__";
+      let group = grouped.find((g) => g.key === key);
+      if (!group) {
+        group = {
+          key,
+          label: item.date ? dateLabel(item.date) : "Unscheduled",
+          items: [],
+        };
+        grouped.push(group);
+      }
+      group.items.push(item);
+    }
+
+    el.reportTimeline.innerHTML = grouped
+      .map(
+        (group) => `
+          <section class="timeline-day-group">
+            <div class="timeline-day-head">
+              <strong>${escapeHtml(group.label)}</strong>
+              <span>${group.items.length} item${group.items.length === 1 ? "" : "s"}</span>
             </div>
-          `
-        )
-        .join("")
-    : `<p class="muted">No itinerary items yet.</p>`;
+            <div class="timeline-day-items">
+              ${group.items
+                .map(
+                  (item) => `
+                    <div class="timeline-item">
+                      <div class="timeline-date">${escapeHtml(item.time || "--:--")}</div>
+                      <div class="timeline-main">
+                        <h5>${escapeHtml(item.title)}</h5>
+                        <p>${escapeHtml(item.location || "Location TBD")} • ${escapeHtml(item.category)} • ${escapeHtml(item.status)}${item.source === "costItem" ? " • Cost Item" : ""}</p>
+                        ${item.notes ? `<p class="muted">${escapeHtml(item.notes)}</p>` : ""}
+                      </div>
+                      <div class="timeline-cost">
+                        <strong>Forecast ${formatEnteredMoney(item.plannedUsd, item.currency)}</strong>
+                        <span>Paid ${formatEnteredMoney(item.paidUsd, item.currency)}</span>
+                        <span class="muted">${money(amountToCad(item.plannedUsd, item.currency), "CAD")} planned</span>
+                      </div>
+                    </div>
+                  `
+                )
+                .join("")}
+            </div>
+          </section>
+        `
+      )
+      .join("");
+  }
 }
 
 function render() {

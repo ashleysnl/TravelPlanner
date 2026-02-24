@@ -2458,7 +2458,7 @@ td {
   border: 1px solid #d8e6fb;
   border-radius: 999px;
   background: #f6faff;
-  padding: 4px 7px;
+  padding: 4px 8px;
   line-height: 1.15;
 }
 
@@ -2532,6 +2532,40 @@ td {
 .timeline-report {
   display: grid;
   gap: 10px;
+}
+
+.timeline-day-group {
+  border: 1px solid #e8eef8;
+  border-radius: 12px;
+  background: #ffffff;
+  overflow: hidden;
+  break-inside: avoid;
+}
+
+.timeline-day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f7faff;
+  border-bottom: 1px solid #e8eef8;
+}
+
+.timeline-day-head strong {
+  font-size: 0.86rem;
+  color: #1c4f8f;
+}
+
+.timeline-day-head span {
+  font-size: 0.74rem;
+  color: #60748d;
+}
+
+.timeline-day-items {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
 }
 
 .timeline-item {
@@ -3206,6 +3240,27 @@ td {
   .report-section-detailed-itinerary {
     break-before: page;
     page-break-before: always;
+  }
+
+  .timeline-day-group {
+    border-radius: 10px;
+  }
+
+  .timeline-day-head {
+    padding: 6px 8px;
+  }
+
+  .timeline-day-head strong {
+    font-size: 0.72rem;
+  }
+
+  .timeline-day-head span {
+    font-size: 0.64rem;
+  }
+
+  .timeline-day-items {
+    gap: 6px;
+    padding: 6px;
   }
 
   .metric-grid {

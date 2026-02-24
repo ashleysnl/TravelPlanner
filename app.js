@@ -338,6 +338,8 @@ const el = {
   reportTimeline: document.getElementById("reportTimeline"),
   backupLastUsed: document.getElementById("backupLastUsed"),
   backupDirtyStatus: document.getElementById("backupDirtyStatus"),
+  settingsAdults: document.getElementById("settingsAdults"),
+  settingsChildren: document.getElementById("settingsChildren"),
   settings: {
     tripName: document.getElementById("tripName"),
     travelers: document.getElementById("travelers"),
@@ -760,6 +762,15 @@ function handleFamilyPrefsChange() {
   render();
 }
 
+function handleSettingsFamilyPrefsChange() {
+  familyPrefs.adults = Math.max(0, Number(el.settingsAdults?.value) || 0);
+  familyPrefs.children = Math.max(0, Number(el.settingsChildren?.value) || 0);
+  saveFamilyPrefs();
+  state.settings.travelers = Math.max(1, familyPrefs.adults + familyPrefs.children || state.settings.travelers || 1);
+  saveState();
+  render();
+}
+
 function syncFamilyPrefsFromTravelerCount(travelerCount) {
   const total = Math.max(1, Number(travelerCount) || 1);
   const currentAdults = Math.max(0, Number(familyPrefs.adults) || 0);
@@ -996,6 +1007,7 @@ function resetActivityForm() {
   uiState.itineraryEditId = null;
   el.activityFormTitle.textContent = "Add Itinerary Item";
   el.activityFormSubmit.textContent = "Add Activity";
+  el.activityFormCancelEdit.textContent = "Cancel";
   el.activityFormCancelEdit.hidden = true;
 }
 
@@ -1017,6 +1029,7 @@ function setActivityFormEditMode(item) {
   inputs.status.value = item.status || "Planned";
   el.activityFormTitle.textContent = "Edit Itinerary Item";
   el.activityFormSubmit.textContent = "Save Changes";
+  el.activityFormCancelEdit.textContent = "Cancel Edit";
   el.activityFormCancelEdit.hidden = false;
 }
 
@@ -1024,6 +1037,8 @@ function showItineraryNewItemForm() {
   uiState.itineraryFormPlacement = { type: "new" };
   resetActivityForm();
   uiState.itineraryFormPlacement = { type: "new" };
+  el.activityFormCancelEdit.textContent = "Cancel";
+  el.activityFormCancelEdit.hidden = false;
 }
 
 function hideItineraryInlineForm() {
@@ -1119,6 +1134,8 @@ function renderItineraryList(summary) {
   } else if (uiState.itineraryFormPlacement?.type === "new") {
     resetActivityForm();
     uiState.itineraryFormPlacement = { type: "new" };
+    el.activityFormCancelEdit.textContent = "Cancel";
+    el.activityFormCancelEdit.hidden = false;
   } else {
     hideItineraryInlineForm();
   }
@@ -1140,6 +1157,7 @@ function resetCostItemForm() {
   uiState.costFormPlacement = null;
   el.costItemFormTitle.textContent = "Add Cost Item";
   el.costItemFormSubmit.textContent = "Add Cost Item";
+  el.costItemFormCancelEdit.textContent = "Cancel";
   el.costItemFormCancelEdit.hidden = true;
 }
 
@@ -1162,6 +1180,7 @@ function setCostItemFormEditMode(item) {
   inputs.itineraryStatus.value = item.itineraryStatus || "Planned";
   el.costItemFormTitle.textContent = "Edit Cost Item";
   el.costItemFormSubmit.textContent = "Save Changes";
+  el.costItemFormCancelEdit.textContent = "Cancel Edit";
   el.costItemFormCancelEdit.hidden = false;
 }
 
@@ -1169,6 +1188,7 @@ function showCostNewItemForm() {
   uiState.costFormPlacement = { type: "new" };
   resetCostItemForm();
   uiState.costFormPlacement = { type: "new" };
+  el.costItemFormCancelEdit.textContent = "Cancel";
   el.costItemFormCancelEdit.hidden = false;
 }
 
@@ -1267,6 +1287,8 @@ function renderCostsList(summary) {
   } else if (uiState.costFormPlacement?.type === "new") {
     resetCostItemForm();
     uiState.costFormPlacement = { type: "new" };
+    el.costItemFormCancelEdit.textContent = "Cancel";
+    el.costItemFormCancelEdit.hidden = false;
   } else {
     hideCostInlineForm();
   }
@@ -1711,6 +1733,12 @@ function syncSettingsInputs() {
     if (document.activeElement === input) return;
     input.value = state.settings[key] ?? "";
   });
+  if (el.settingsAdults && document.activeElement !== el.settingsAdults) {
+    el.settingsAdults.value = String(Math.max(0, Number(familyPrefs.adults) || 0));
+  }
+  if (el.settingsChildren && document.activeElement !== el.settingsChildren) {
+    el.settingsChildren.value = String(Math.max(0, Number(familyPrefs.children) || 0));
+  }
 }
 
 function renderFamilyBudgetSummary(summary) {
@@ -2612,6 +2640,10 @@ Object.values(el.settings).forEach((input) => {
   input?.addEventListener("change", handleFamilyPrefsChange);
 });
 el.familySplitToggle?.addEventListener("change", handleFamilyPrefsChange);
+[el.settingsAdults, el.settingsChildren].forEach((input) => {
+  input?.addEventListener("input", handleSettingsFamilyPrefsChange);
+  input?.addEventListener("change", handleSettingsFamilyPrefsChange);
+});
 
 getCategorySelects().forEach((select) => {
   select.dataset.lastValue = select.value;

@@ -290,6 +290,13 @@ body {
   font-size: 0.76rem;
 }
 
+.trip-snapshot-item .currency-note {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
 .trip-snapshot-item .value {
   margin: 5px 0 2px;
   font-size: 1rem;

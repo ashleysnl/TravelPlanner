@@ -1821,17 +1821,20 @@ function renderTripSnapshot(summary) {
 
   const snapshotItems = [
     {
-      label: `Budget (${currencyLabel})`,
+      label: "Budget",
+      currency: currencyLabel,
       value: Number(summary.budgetCad) > 0 ? moneyDisplayRoundedFromCad(summary.budgetCad) : "—",
       sub: Number(summary.budgetCad) > 0 ? "Trip budget" : "Set budget in Settings",
     },
     {
-      label: `Forecasted Cost (${currencyLabel})`,
+      label: "Forecasted",
+      currency: currencyLabel,
       value: hasCosts ? moneyDisplayRoundedFromCad(summary.plannedCad) : "—",
       sub: hasCosts ? "Forecast total" : "Add costs to calculate",
     },
     {
-      label: `Paid to Date (${currencyLabel})`,
+      label: "Paid to Date",
+      currency: currencyLabel,
       value: hasCosts ? moneyDisplayRoundedFromCad(summary.paidCad) : "—",
       sub: hasCosts ? "Paid so far" : "Add costs to calculate",
     },
@@ -1852,7 +1855,7 @@ function renderTripSnapshot(summary) {
     .map(
       (item) => `
         <article class="trip-snapshot-item"${item.title ? ` title="${escapeHtml(item.title)}"` : ""}>
-          <p class="label">${item.label}</p>
+          <p class="label">${item.label}${item.currency ? ` <span class="currency-note">${item.currency}</span>` : ""}</p>
           <p class="value">${item.value}</p>
           <p class="sub">${item.sub}</p>
         </article>

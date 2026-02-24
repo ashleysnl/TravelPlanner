@@ -344,6 +344,7 @@ const el = {
   backupDirtyStatus: document.getElementById("backupDirtyStatus"),
   settingsAdults: document.getElementById("settingsAdults"),
   settingsChildren: document.getElementById("settingsChildren"),
+  totalBudgetLabelText: document.getElementById("totalBudgetLabelText"),
   settings: {
     tripName: document.getElementById("tripName"),
     travelers: document.getElementById("travelers"),
@@ -577,7 +578,7 @@ function displayCurrencyCode() {
 }
 
 function displayCurrencyLabel() {
-  return displayCurrencyCode() === "CAD" ? "CDN" : displayCurrencyCode();
+  return displayCurrencyCode();
 }
 
 function cadToDisplay(amountCad) {
@@ -592,6 +593,15 @@ function cadToDisplay(amountCad) {
     const rate = Number(state.settings?.eurToCadRate) || 1.47;
     return rate > 0 ? amount / rate : 0;
   }
+  return amount;
+}
+
+function displayToCad(amountDisplay, currencyCode = displayCurrencyCode()) {
+  const amount = Number(amountDisplay) || 0;
+  const code = normalizeDisplayCurrency(currencyCode);
+  if (code === "CAD") return amount;
+  if (code === "USD") return amount * (Number(state.settings?.usdToCadRate) || 1.36);
+  if (code === "EUR") return amount * (Number(state.settings?.eurToCadRate) || 1.47);
   return amount;
 }
 
@@ -1801,8 +1811,16 @@ function calculateSummary() {
 function syncSettingsInputs() {
   Object.entries(el.settings).forEach(([key, input]) => {
     if (document.activeElement === input) return;
+    if (key === "totalBudgetCad") return;
     input.value = state.settings[key] ?? "";
   });
+  if (el.settings.totalBudgetCad && document.activeElement !== el.settings.totalBudgetCad) {
+    const displayBudget = cadToDisplay(state.settings.totalBudgetCad || 0);
+    el.settings.totalBudgetCad.value = Number.isFinite(displayBudget) ? String(Number(displayBudget.toFixed(2))) : "0";
+  }
+  if (el.totalBudgetLabelText) {
+    el.totalBudgetLabelText.textContent = `Total Budget (${displayCurrencyLabel()})`;
+  }
   if (el.settingsAdults && document.activeElement !== el.settingsAdults) {
     el.settingsAdults.value = String(Math.max(0, Number(familyPrefs.adults) || 0));
   }
@@ -2265,14 +2283,16 @@ function render() {
 }
 
 function updateSettingsFromInputs() {
+  const budgetFieldCurrency = displayCurrencyCode();
+  const nextDisplayCurrency = normalizeDisplayCurrency(el.settings.displayCurrency?.value || budgetFieldCurrency);
   state.settings.tripName = el.settings.tripName.value;
   state.settings.travelers = Number(el.settings.travelers.value) || 1;
   state.settings.startDate = el.settings.startDate.value;
   state.settings.endDate = el.settings.endDate.value;
-  state.settings.totalBudgetCad = Number(el.settings.totalBudgetCad.value) || 0;
-  state.settings.displayCurrency = normalizeDisplayCurrency(el.settings.displayCurrency?.value || "USD");
   state.settings.usdToCadRate = Number(el.settings.usdToCadRate.value) || 0;
   state.settings.eurToCadRate = Number(el.settings.eurToCadRate?.value) || 0;
+  state.settings.totalBudgetCad = Math.max(0, displayToCad(el.settings.totalBudgetCad.value, budgetFieldCurrency));
+  state.settings.displayCurrency = nextDisplayCurrency;
   syncFamilyPrefsFromTravelerCount(state.settings.travelers);
   saveState();
   render();

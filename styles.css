@@ -530,6 +530,21 @@ body {
 .control-panel .stack-form {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
+  gap: 10px;
+}
+
+.control-panel .stack-form .settings-half-field {
+  min-width: 0;
+}
+
+.control-panel .stack-form label {
+  gap: 4px;
+}
+
+.control-panel .stack-form input,
+.control-panel .stack-form select {
+  min-height: 38px;
+  padding: 8px 10px;
 }
 
 label {
@@ -1829,7 +1844,18 @@ td {
   }
 
   .control-panel .stack-form {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .control-panel .stack-form label {
+    font-size: 0.84rem;
+  }
+
+  .control-panel .stack-form input,
+  .control-panel .stack-form select {
+    min-height: 36px;
+    padding: 8px 10px;
   }
 
   .settings-currency-grid {

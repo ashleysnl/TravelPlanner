@@ -342,6 +342,8 @@ const el = {
   reportRate: document.getElementById("reportRate"),
   reportGenerated: document.getElementById("reportGenerated"),
   reportMetrics: document.getElementById("reportMetrics"),
+  reportCharts: document.getElementById("reportCharts"),
+  reportItinerarySummary: document.getElementById("reportItinerarySummary"),
   reportBreakdown: document.getElementById("reportBreakdown"),
   reportFamilySummary: document.getElementById("reportFamilySummary"),
   reportTimeline: document.getElementById("reportTimeline"),
@@ -1171,10 +1173,10 @@ function resetActivityForm() {
   el.activityFormCancelEdit.hidden = true;
 }
 
-function setActivityFormEditMode(item) {
+function setActivityFormEditMode(item, { placementType = "edit" } = {}) {
   const inputs = el.activityInputs;
   uiState.itineraryEditId = item.id;
-  uiState.itineraryFormPlacement = { type: "edit", id: item.id };
+  uiState.itineraryFormPlacement = { type: placementType, id: item.id };
   inputs.mode.value = "edit";
   inputs.editId.value = item.id;
   inputs.date.value = item.date || "";
@@ -1234,6 +1236,8 @@ function mountItineraryFormInline() {
     slot = composer.querySelector('[data-inline-slot="new"]');
   } else if (placement.type === "new-day" && placement.date) {
     slot = list.querySelector(`[data-inline-slot="day-new"][data-date="${placement.date}"]`);
+  } else if (placement.type === "edit-cost-hub" && placement.id) {
+    slot = el.costsList?.querySelector(`[data-inline-slot="cost-hub-activity-edit"][data-item-id="${placement.id}"]`) || null;
   } else if (placement.type === "edit" && placement.id) {
     slot = list.querySelector(`[data-inline-slot="edit"][data-item-id="${placement.id}"]`);
   }
@@ -1405,10 +1409,13 @@ function renderItineraryList(summary) {
         actionPrefix: "itineraryEmpty",
       });
 
-  if (uiState.itineraryFormPlacement?.type === "edit" && uiState.itineraryEditId) {
+  if (
+    (uiState.itineraryFormPlacement?.type === "edit" || uiState.itineraryFormPlacement?.type === "edit-cost-hub") &&
+    uiState.itineraryEditId
+  ) {
     const active = summary.activities.find((item) => item.id === uiState.itineraryEditId);
     if (active) {
-      setActivityFormEditMode(active);
+      setActivityFormEditMode(active, { placementType: uiState.itineraryFormPlacement.type });
     } else {
       resetActivityForm();
       uiState.itineraryFormPlacement = null;
@@ -1627,7 +1634,7 @@ function renderCostsList(summary) {
                     <button class="icon-btn danger" data-action="deleteCostItem" data-id="${entry.id}">Delete</button>
                   `
                   : `
-                    <button class="icon-btn" data-action="costHubEditActivity" data-id="${entry.id}">Edit in Itinerary</button>
+                    <button class="icon-btn" data-action="costHubEditActivity" data-id="${entry.id}">Edit</button>
                     <button class="icon-btn" data-action="markPaid" data-id="${entry.id}">Mark Paid</button>
                     <button class="icon-btn danger" data-action="delete" data-id="${entry.id}">Delete</button>
                   `
@@ -1635,7 +1642,11 @@ function renderCostsList(summary) {
             </div>
           </div>
         </details>
-        ${isCostItem ? `<div class="day-detail-inline-slot" data-inline-slot="edit" data-item-id="${entry.id}"></div>` : ""}
+        ${
+          isCostItem
+            ? `<div class="day-detail-inline-slot" data-inline-slot="edit" data-item-id="${entry.id}"></div>`
+            : `<div class="day-detail-inline-slot" data-inline-slot="cost-hub-activity-edit" data-item-id="${entry.id}"></div>`
+        }
       </div>
     `;
   };
@@ -1666,7 +1677,7 @@ function renderCostsList(summary) {
         </div>
       </section>
       ${renderGroupSection({
-        title: "Itinerary & Active Costs",
+        title: "Itenary and Activity Costs",
         subtitle: "Scheduled activities and itinerary-linked costs",
         entries: groups.itineraryEntries,
         emptyText: "No itinerary-linked costs yet.",
@@ -1702,6 +1713,9 @@ function renderCostsList(summary) {
   }
 
   mountCostFormInline();
+  if (uiState.itineraryFormPlacement?.type === "edit-cost-hub") {
+    mountItineraryFormInline();
+  }
 }
 
 function setDashboardQuickFormEditMode(entry) {
@@ -2500,11 +2514,14 @@ function renderReport(summary) {
     timeStyle: "short",
   }).format(new Date());
 
+  const travelerCountForCost = Number(summary.familySummary?.totalTravelers) || 0;
   const reportMetrics = [
     [`Budget (${displayCurrencyLabel()})`, moneyDisplayFromCad(summary.budgetCad)],
-    [`Forecast (${displayCurrencyLabel()})`, moneyDisplayFromCad(summary.plannedCad)],
-    [`Paid (${displayCurrencyLabel()})`, moneyDisplayFromCad(summary.paidCad)],
-    [`Outstanding (${displayCurrencyLabel()})`, moneyDisplayFromCad(summary.outstandingCad)],
+    [`Total Planned (${displayCurrencyLabel()})`, moneyDisplayFromCad(summary.plannedCad)],
+    [`Total Paid (${displayCurrencyLabel()})`, moneyDisplayFromCad(summary.paidCad)],
+    [`Cost / Person (${displayCurrencyLabel()})`, travelerCountForCost ? moneyDisplayFromCad(summary.familySummary.perPersonPlannedCad) : "—"],
+    ["Trip Days", summary.tripDays ? `${summary.tripDays}` : "—"],
+    ["Activities", String((summary.activities || []).length || 0)],
   ];
 
   el.reportMetrics.innerHTML = reportMetrics
@@ -2517,6 +2534,150 @@ function renderReport(summary) {
       `
     )
     .join("");
+
+  const breakdownRows = Object.entries(summary.byCategory).sort((a, b) => b[1].plannedCad - a[1].plannedCad);
+  if (el.reportCharts) {
+    if (!breakdownRows.length) {
+      el.reportCharts.innerHTML = `<p class="muted">No cost data yet.</p>`;
+    } else {
+      const palette = ["#0f6abf", "#0ea5a8", "#ff8c42", "#22c55e", "#ef4444", "#8b5cf6", "#64748b"];
+      const totalPlanned = summary.plannedCad || 1;
+      const segments = breakdownRows.map(([name, data], index) => ({
+        name,
+        data,
+        color: palette[index % palette.length],
+        share: totalPlanned > 0 ? (data.plannedCad / totalPlanned) * 100 : 0,
+      }));
+
+      let startPct = 0;
+      const donutRadius = 46;
+      const donutStroke = 20;
+      const circumference = 2 * Math.PI * donutRadius;
+      const svgSegments = segments
+        .map((seg) => {
+          const fraction = Math.max(0, seg.share) / 100;
+          const dash = fraction * circumference;
+          const offset = -(startPct / 100) * circumference;
+          startPct += seg.share;
+          return `<circle cx="60" cy="60" r="${donutRadius}" fill="none" stroke="${seg.color}" stroke-width="${donutStroke}" stroke-dasharray="${dash} ${Math.max(0, circumference - dash)}" stroke-dashoffset="${offset}"></circle>`;
+        })
+        .join("");
+
+      const barRows = segments
+        .map(
+          (seg) => `
+            <div class="report-chart-bar-row">
+              <div class="report-chart-bar-label"><span class="swatch" style="background:${seg.color}"></span>${escapeHtml(seg.name)}</div>
+              <div class="report-chart-bar-track"><div class="report-chart-bar-fill" style="width:${Math.max(0, Math.min(100, seg.share)).toFixed(1)}%; background:${seg.color};"></div></div>
+              <div class="report-chart-bar-value">${moneyDisplayFromCad(seg.data.plannedCad)}</div>
+            </div>
+          `
+        )
+        .join("");
+
+      const legendRows = segments
+        .map(
+          (seg) => `
+            <div class="report-donut-legend-row">
+              <span class="swatch" style="background:${seg.color}"></span>
+              <span>${escapeHtml(seg.name)}</span>
+              <span>${seg.share.toFixed(0)}%</span>
+            </div>
+          `
+        )
+        .join("");
+
+      el.reportCharts.innerHTML = `
+        <div class="report-charts-grid">
+          <div class="report-chart-card">
+            <h5>Forecast by Category (Bar)</h5>
+            <div class="report-chart-bars">${barRows}</div>
+          </div>
+          <div class="report-chart-card">
+            <h5>Forecast by Category (Donut)</h5>
+            <div class="report-donut-wrap">
+              <div class="report-donut-chart">
+                <svg viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+                  <circle cx="60" cy="60" r="${donutRadius}" fill="none" stroke="#edf2fb" stroke-width="${donutStroke}"></circle>
+                  ${svgSegments}
+                </svg>
+                <div class="report-donut-center">
+                  <span>Forecast</span>
+                  <strong>${compactDisplayFromCad(summary.plannedCad)}</strong>
+                  <small>${displayCurrencyLabel()}</small>
+                </div>
+              </div>
+              <div class="report-donut-legend">${legendRows}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  if (el.reportItinerarySummary) {
+    const planner = getItineraryPlannerDays(summary);
+    const summaryDays = planner.days.length ? planner.days : [];
+    const unscheduled = planner.unscheduled || [];
+    el.reportItinerarySummary.innerHTML = summaryDays.length || unscheduled.length
+      ? `
+        <div class="report-itinerary-calendar">
+          ${summaryDays
+            .map(
+              (day) => `
+                <div class="report-calendar-day">
+                  <div class="report-calendar-day-head">
+                    <strong>${escapeHtml(day.shortLabel)}</strong>
+                    <span>${day.items.length}</span>
+                  </div>
+                  <div class="report-calendar-day-body">
+                    ${
+                      day.items.length
+                        ? day.items
+                            .map(
+                              (item) => `
+                                <div class="report-calendar-item">
+                                  <span class="time">${escapeHtml(item.time || "--:--")}</span>
+                                  <span class="title">${escapeHtml(item.title)}</span>
+                                </div>
+                              `
+                            )
+                            .join("")
+                        : `<div class="muted">No items</div>`
+                    }
+                  </div>
+                </div>
+              `
+            )
+            .join("")}
+          ${
+            unscheduled.length
+              ? `
+                <div class="report-calendar-day report-calendar-day-unscheduled">
+                  <div class="report-calendar-day-head">
+                    <strong>Unscheduled</strong>
+                    <span>${unscheduled.length}</span>
+                  </div>
+                  <div class="report-calendar-day-body">
+                    ${unscheduled
+                      .map(
+                        (item) => `
+                          <div class="report-calendar-item">
+                            <span class="time">--:--</span>
+                            <span class="title">${escapeHtml(item.title)}</span>
+                          </div>
+                        `
+                      )
+                      .join("")}
+                  </div>
+                </div>
+              `
+              : ""
+          }
+        </div>
+      `
+      : `<p class="muted">No itinerary items yet.</p>`;
+  }
 
   if (el.reportFamilySummary) {
     const f = summary.familySummary;
@@ -2555,7 +2716,6 @@ function renderReport(summary) {
     `;
   }
 
-  const breakdownRows = Object.entries(summary.byCategory).sort((a, b) => b[1].plannedCad - a[1].plannedCad);
   el.reportBreakdown.innerHTML = `
     <div class="report-table">
       <div class="report-table-row header">
@@ -2880,8 +3040,7 @@ function handleCostsListClick(event) {
   if (action === "costHubEditActivity") {
     const item = state.activities.find((a) => a.id === id);
     if (!item) return;
-    setActivityFormEditMode(item);
-    switchTab("itinerary");
+    setActivityFormEditMode(item, { placementType: "edit-cost-hub" });
     render();
     requestAnimationFrame(() => el.activityInputs.title?.focus());
     return;

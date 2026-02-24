@@ -2280,6 +2280,180 @@ td {
   font-size: 0.95rem;
 }
 
+.report-charts {
+  display: grid;
+  gap: 10px;
+}
+
+.report-charts-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 10px;
+}
+
+.report-chart-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: #fff;
+}
+
+.report-chart-card h5 {
+  margin: 0 0 8px;
+  font-size: 0.84rem;
+}
+
+.report-chart-bars {
+  display: grid;
+  gap: 6px;
+}
+
+.report-chart-bar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1.3fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.report-chart-bar-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 0.78rem;
+}
+
+.report-chart-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #edf2fb;
+  overflow: hidden;
+}
+
+.report-chart-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.report-chart-bar-value {
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.report-donut-wrap {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.report-donut-chart {
+  width: 120px;
+  height: 120px;
+  position: relative;
+}
+
+.report-donut-chart svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.report-donut-center {
+  position: absolute;
+  inset: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+  padding: 6px;
+}
+
+.report-donut-center span,
+.report-donut-center small {
+  color: var(--muted);
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+.report-donut-center strong {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.report-donut-legend {
+  display: grid;
+  gap: 5px;
+}
+
+.report-donut-legend-row {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.76rem;
+}
+
+.report-itinerary-summary {
+  display: grid;
+  gap: 10px;
+}
+
+.report-itinerary-calendar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.report-calendar-day {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px;
+  break-inside: avoid;
+}
+
+.report-calendar-day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.report-calendar-day-head strong {
+  font-size: 0.82rem;
+}
+
+.report-calendar-day-head span {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.report-calendar-day-body {
+  display: grid;
+  gap: 5px;
+  font-size: 0.76rem;
+}
+
+.report-calendar-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.report-calendar-item .time {
+  color: var(--brand);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .report-footer-line {
   margin: 14px 0 0;
   padding-top: 10px;
@@ -2450,6 +2624,32 @@ td {
 
   .report-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .report-charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-donut-wrap {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .report-itinerary-calendar {
+    grid-template-columns: 1fr;
+  }
+
+  .report-charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-donut-wrap {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .report-itinerary-calendar {
+    grid-template-columns: 1fr;
   }
 
   .dashboard-trip-header {
@@ -2754,6 +2954,18 @@ td {
     flex-direction: column;
   }
 
+  .report-chart-bar-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    align-items: start;
+  }
+
+  .report-chart-bar-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    align-items: start;
+  }
+
   .timeline-head {
     flex-direction: column;
     align-items: flex-start;
@@ -2897,6 +3109,18 @@ td {
   .dashboard-panel .panel-header p,
   .dashboard-timeline .timeline-unscheduled {
     margin-bottom: 0;
+  }
+
+  .report-section {
+    break-inside: avoid;
+  }
+
+  .report-charts-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .report-itinerary-calendar {
+    grid-template-columns: 1fr 1fr;
   }
 
   .metric-grid {

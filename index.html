@@ -16,7 +16,7 @@
         <p class="hero-subtitle">Offline • No login • Your data stays on your device</p>
         <p class="hero-proof">Private, local-first trip planning. No cloud. No tracking.</p>
         <div class="hero-cta-row no-print">
-          <button id="startPlanningBtn" class="btn btn-primary" type="button">Load Trip</button>
+          <button id="startPlanningBtn" class="btn btn-primary" type="button">Open Trip</button>
           <a
             class="btn btn-secondary control-btn support-link-btn"
             href="https://buymeacoffee.com/ashleysnl"
@@ -438,21 +438,34 @@
             </div>
           </div>
 
-          <div class="report-metrics" id="reportMetrics"></div>
-
           <div class="report-section">
-            <h4>Family Cost Summary</h4>
-            <div id="reportFamilySummary"></div>
+            <h4>Trip Snapshot</h4>
+            <div class="report-metrics" id="reportMetrics"></div>
           </div>
 
           <div class="report-section">
-            <h4>Budget Breakdown</h4>
+            <h4>Cost Charts</h4>
+            <div id="reportCharts" class="report-charts"></div>
+          </div>
+
+          <div class="report-section">
+            <h4>Summary Itinerary</h4>
+            <div id="reportItinerarySummary" class="report-itinerary-summary"></div>
+          </div>
+
+          <div class="report-section">
+            <h4>Detailed Itinerary</h4>
+            <div id="reportTimeline" class="timeline-report"></div>
+          </div>
+
+          <div class="report-section">
+            <h4>Budget Breakdown Table</h4>
             <div id="reportBreakdown"></div>
           </div>
 
           <div class="report-section">
-            <h4>Activity Timeline</h4>
-            <div id="reportTimeline" class="timeline-report"></div>
+            <h4>Family Cost Summary</h4>
+            <div id="reportFamilySummary"></div>
           </div>
           <p class="report-footer-line">Private, local-first trip planning. No login. No tracking.</p>
         </div>

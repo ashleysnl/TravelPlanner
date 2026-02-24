@@ -1201,6 +1201,17 @@ function showItineraryNewItemForm() {
   el.activityFormCancelEdit.hidden = false;
 }
 
+function showItineraryNewItemFormForDate(date) {
+  uiState.itineraryFormPlacement = { type: "new-day", date: date || "" };
+  resetActivityForm();
+  uiState.itineraryFormPlacement = { type: "new-day", date: date || "" };
+  if (el.activityInputs?.date && date) {
+    el.activityInputs.date.value = date;
+  }
+  el.activityFormCancelEdit.textContent = "Cancel";
+  el.activityFormCancelEdit.hidden = false;
+}
+
 function hideItineraryInlineForm() {
   uiState.itineraryFormPlacement = null;
   uiState.itineraryEditId = null;
@@ -1221,6 +1232,8 @@ function mountItineraryFormInline() {
   let slot = null;
   if (placement.type === "new") {
     slot = composer.querySelector('[data-inline-slot="new"]');
+  } else if (placement.type === "new-day" && placement.date) {
+    slot = list.querySelector(`[data-inline-slot="day-new"][data-date="${placement.date}"]`);
   } else if (placement.type === "edit" && placement.id) {
     slot = list.querySelector(`[data-inline-slot="edit"][data-item-id="${placement.id}"]`);
   }
@@ -1341,7 +1354,10 @@ function renderItineraryList(summary) {
               <h4>${escapeHtml(day.shortLabel)}</h4>
               <p class="muted small-copy">${escapeHtml(day.fullLabel)}</p>
             </div>
-            <span class="itinerary-day-count">${day.items.length} item${day.items.length === 1 ? "" : "s"}</span>
+            <div class="itinerary-day-head-actions">
+              <span class="itinerary-day-count">${day.items.length} item${day.items.length === 1 ? "" : "s"}</span>
+              <button type="button" class="icon-btn itinerary-day-add-btn" data-action="showItineraryNewItemForDay" data-date="${day.key}" aria-label="Add itinerary item for ${escapeHtml(day.fullLabel)}" title="Add item for this day">+</button>
+            </div>
           </div>
           <div class="itinerary-day-body">
             ${
@@ -1349,6 +1365,7 @@ function renderItineraryList(summary) {
                 ? day.items.map(renderPlannerItem).join("")
                 : `<div class="itinerary-day-empty muted">No activities planned yet.</div>`
             }
+            <div class="day-detail-inline-slot" data-inline-slot="day-new" data-date="${day.key}"></div>
           </div>
         </section>
       `
@@ -1399,6 +1416,15 @@ function renderItineraryList(summary) {
   } else if (uiState.itineraryFormPlacement?.type === "new") {
     resetActivityForm();
     uiState.itineraryFormPlacement = { type: "new" };
+    el.activityFormCancelEdit.textContent = "Cancel";
+    el.activityFormCancelEdit.hidden = false;
+  } else if (uiState.itineraryFormPlacement?.type === "new-day") {
+    const targetDate = uiState.itineraryFormPlacement.date || "";
+    resetActivityForm();
+    uiState.itineraryFormPlacement = { type: "new-day", date: targetDate };
+    if (el.activityInputs?.date && targetDate) {
+      el.activityInputs.date.value = targetDate;
+    }
     el.activityFormCancelEdit.textContent = "Cancel";
     el.activityFormCancelEdit.hidden = false;
   } else {
@@ -2658,6 +2684,13 @@ function handleItineraryListClick(event) {
 
   if (action === "showItineraryNewItem") {
     showItineraryNewItemForm();
+    render();
+    requestAnimationFrame(() => el.activityInputs.title?.focus());
+    return;
+  }
+
+  if (action === "showItineraryNewItemForDay") {
+    showItineraryNewItemFormForDate(button.dataset.date || "");
     render();
     requestAnimationFrame(() => el.activityInputs.title?.focus());
     return;

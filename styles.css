@@ -1744,6 +1744,20 @@ textarea {
   white-space: nowrap;
 }
 
+.itinerary-day-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.itinerary-day-add-btn {
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .itinerary-day-body {
   display: grid;
   gap: 8px;
@@ -2439,6 +2453,11 @@ td {
   .itinerary-day-head {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .itinerary-day-head-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .itinerary-plan-summary {

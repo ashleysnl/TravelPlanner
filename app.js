@@ -1100,7 +1100,7 @@ function renderItineraryList(summary) {
                   <div class="itinerary-card-sub muted">${escapeHtml(item.location || "Location TBD")}</div>
                   ${item.notes ? `<div class="itinerary-card-notes muted">${escapeHtml(item.notes)}</div>` : ""}
                   <div class="itinerary-card-costs">
-                    <div><span class="muted">Planned</span> ${formatEnteredMoney(item.plannedUsd, item.currency)} <span class="muted">(${money(amountToCad(item.plannedUsd, item.currency), "CAD")})</span></div>
+                    <div><span class="muted">Forecast</span> ${formatEnteredMoney(item.plannedUsd, item.currency)} <span class="muted">(${money(amountToCad(item.plannedUsd, item.currency), "CAD")})</span></div>
                     <div><span class="muted">Paid</span> ${formatEnteredMoney(item.paidUsd, item.currency)} <span class="muted">(${money(amountToCad(item.paidUsd, item.currency), "CAD")})</span></div>
                   </div>
                 </div>
@@ -1257,7 +1257,7 @@ function renderCostsList(summary) {
                   <div class="itinerary-card-sub muted">${escapeHtml(itineraryMeta)}</div>
                   ${item.notes ? `<div class="itinerary-card-notes muted">${escapeHtml(item.notes)}</div>` : ""}
                   <div class="itinerary-card-costs">
-                    <div><span class="muted">Planned</span> ${formatEnteredMoney(item.plannedUsd, item.currency)} <span class="muted">(${money(amountToCad(item.plannedUsd, item.currency), "CAD")})</span></div>
+                    <div><span class="muted">Forecast</span> ${formatEnteredMoney(item.plannedUsd, item.currency)} <span class="muted">(${money(amountToCad(item.plannedUsd, item.currency), "CAD")})</span></div>
                     <div><span class="muted">Paid</span> ${formatEnteredMoney(item.paidUsd, item.currency)} <span class="muted">(${money(amountToCad(item.paidUsd, item.currency), "CAD")})</span></div>
                   </div>
                 </div>
@@ -1477,7 +1477,7 @@ function renderCompactDashboardTimeline(summary) {
             item.time ? `Time: ${item.time}` : "Time: Unscheduled",
             `Category: ${item.category}`,
             `Status: ${item.status}`,
-            `Planned: ${formatEnteredMoney(item.plannedUsd, item.currency)} (${money(amountToCad(item.plannedUsd, item.currency), "CAD")})`,
+            `Forecast: ${formatEnteredMoney(item.plannedUsd, item.currency)} (${money(amountToCad(item.plannedUsd, item.currency), "CAD")})`,
             `Paid: ${formatEnteredMoney(item.paidUsd, item.currency)} (${money(amountToCad(item.paidUsd, item.currency), "CAD")})`,
             item.location ? `Location: ${item.location}` : "",
             item.notes ? `Notes: ${item.notes}` : "",
@@ -1742,26 +1742,25 @@ function syncSettingsInputs() {
 function renderTripSnapshot(summary) {
   if (!el.tripSnapshotGrid) return;
 
-  const travelerCount = Math.max(0, Number(summary.familySummary?.totalTravelers) || Number(state.settings.travelers) || 0);
   const hasCosts = Number(summary.plannedCad) > 0 || Number(summary.paidCad) > 0;
   const hasDates = Boolean(summary.tripDays);
   const hasActivities = (summary.activities || []).length > 0;
 
   const snapshotItems = [
     {
-      label: "Total Trip Cost",
-      value: hasCosts ? money(summary.plannedCad, "CAD") : "—",
-      sub: hasCosts ? "Planned total" : "Add costs to calculate",
+      label: "Budget",
+      value: Number(summary.budgetCad) > 0 ? money(summary.budgetCad, "CAD") : "—",
+      sub: Number(summary.budgetCad) > 0 ? "Trip budget" : "Set budget in Settings",
     },
     {
-      label: "Total Paid",
+      label: "Forecasted Cost",
+      value: hasCosts ? money(summary.plannedCad, "CAD") : "—",
+      sub: hasCosts ? "Forecast total" : "Add costs to calculate",
+    },
+    {
+      label: "Paid to Date",
       value: hasCosts ? money(summary.paidCad, "CAD") : "—",
       sub: hasCosts ? "Paid so far" : "Add costs to calculate",
-    },
-    {
-      label: "Cost per person",
-      value: hasCosts && travelerCount > 0 ? money(summary.familySummary.perPersonPlannedCad, "CAD") : "—",
-      sub: travelerCount > 0 ? `${travelerCount} traveler${travelerCount === 1 ? "" : "s"}` : "Set adults and kids",
     },
     {
       label: "Trip length",
@@ -1872,21 +1871,21 @@ function renderFamilyBudgetSummary(summary) {
   const f = summary.familySummary;
   const familyOutstandingCad = Math.max(0, f.plannedCad - f.paidCad);
   const stats = [
-    ["Per traveler (planned)", f.totalTravelers ? money(f.perPersonPlannedCad, "CAD") : "—"],
+    ["Per traveler (forecast)", f.totalTravelers ? money(f.perPersonPlannedCad, "CAD") : "—"],
     ["Per traveler (left to pay)", f.totalTravelers ? money(familyOutstandingCad / f.totalTravelers, "CAD") : "—"],
   ];
 
   if (f.showSplitByRole) {
-    stats.push(["Per adult (planned)", f.adults ? money(f.perAdultPlannedCad, "CAD") : "—"]);
+    stats.push(["Per adult (forecast)", f.adults ? money(f.perAdultPlannedCad, "CAD") : "—"]);
     stats.push(["Per adult (left to pay)", f.adults ? money(Math.max(0, f.perAdultPlannedCad - f.perAdultPaidCad), "CAD") : "—"]);
-    stats.push(["Per child (planned)", f.children ? money(f.perChildPlannedCad, "CAD") : "—"]);
+    stats.push(["Per child (forecast)", f.children ? money(f.perChildPlannedCad, "CAD") : "—"]);
     stats.push(["Per child (left to pay)", f.children ? money(Math.max(0, f.perChildPlannedCad - f.perChildPaidCad), "CAD") : "—"]);
   }
 
   const totalsLine = `
     <div class="family-budget-totals">
       <span><strong>Travelers:</strong> ${f.totalTravelers} (${f.adults} adult${f.adults === 1 ? "" : "s"}, ${f.children} child${f.children === 1 ? "" : "ren"})</span>
-      <span><strong>Paid so far:</strong> ${money(f.paidCad, "CAD")} of ${money(f.plannedCad, "CAD")}</span>
+      <span><strong>Paid so far:</strong> ${money(f.paidCad, "CAD")} of forecast ${money(f.plannedCad, "CAD")}</span>
       <span><strong>Left to pay:</strong> ${money(familyOutstandingCad, "CAD")}</span>
     </div>
   `;
@@ -1920,35 +1919,10 @@ function renderDashboard(summary) {
   renderOnboardingPanel();
   renderFamilyBudgetSummary(summary);
 
-  const metrics = [
-    {
-      label: "Trip Budget (CDN)",
-      value: money(summary.budgetCad, "CAD"),
-      sub: "Editable in Trip Settings",
-    },
-    {
-      label: "Planned Total (CDN)",
-      value: money(summary.plannedCad, "CAD"),
-      sub: `${summary.budgetCad > 0 ? Math.round((summary.plannedCad / summary.budgetCad) * 100) : 0}% of budget`,
-    },
-    {
-      label: summary.remainingCad < 0 ? "Over Budget (Planned)" : "Budget Left (Planned)",
-      value: money(Math.abs(summary.remainingCad), "CAD"),
-      sub: `Paid so far: ${money(summary.paidCad, "CAD")} • Left to pay: ${money(Math.max(0, summary.outstandingCad), "CAD")}`,
-    },
-  ];
-
-  el.metricGrid.innerHTML = metrics
-    .map(
-      (metric) => `
-        <article class="metric-card">
-          <p class="label">${metric.label}</p>
-          <p class="value">${metric.value}</p>
-          <p class="sub">${metric.sub}</p>
-        </article>
-      `
-    )
-    .join("");
+  if (el.metricGrid) {
+    el.metricGrid.innerHTML = "";
+    el.metricGrid.hidden = true;
+  }
 
   const categories = Object.entries(summary.byCategory)
     .sort((a, b) => b[1].plannedCad - a[1].plannedCad);
@@ -1994,7 +1968,7 @@ function renderDashboard(summary) {
             <div class="donut-wrap">
               <div class="donut-chart" style="background: conic-gradient(${gradient});">
                 <div class="donut-hole">
-                  <span class="donut-label">Planned</span>
+                  <span class="donut-label">Forecast</span>
                   <strong>${compactCad(summary.plannedCad)}</strong>
                   <small class="donut-note">CDN</small>
                 </div>
@@ -2089,7 +2063,7 @@ function renderReport(summary) {
 
   const reportMetrics = [
     ["Budget (CDN)", money(summary.budgetCad, "CAD")],
-    ["Planned (CDN)", money(summary.plannedCad, "CAD")],
+    ["Forecast (CDN)", money(summary.plannedCad, "CAD")],
     ["Paid (CDN)", money(summary.paidCad, "CAD")],
     ["Outstanding (CDN)", money(summary.outstandingCad, "CAD")],
   ];
@@ -2111,15 +2085,15 @@ function renderReport(summary) {
       ["Adults", String(f.adults)],
       ["Children", String(f.children)],
       ["Total travelers", String(f.totalTravelers)],
-      ["Total planned cost", money(f.plannedCad, "CAD")],
+      ["Total forecasted cost", money(f.plannedCad, "CAD")],
       ["Total paid cost", money(f.paidCad, "CAD")],
-      ["Planned per person", f.totalTravelers ? money(f.perPersonPlannedCad, "CAD") : "—"],
+      ["Forecast per person", f.totalTravelers ? money(f.perPersonPlannedCad, "CAD") : "—"],
       ["Paid per person", f.totalTravelers ? money(f.perPersonPaidCad, "CAD") : "—"],
     ];
     if (f.showSplitByRole) {
-      familyRows.push(["Planned per adult", f.adults ? money(f.perAdultPlannedCad, "CAD") : "—"]);
+      familyRows.push(["Forecast per adult", f.adults ? money(f.perAdultPlannedCad, "CAD") : "—"]);
       familyRows.push(["Paid per adult", f.adults ? money(f.perAdultPaidCad, "CAD") : "—"]);
-      familyRows.push(["Planned per child", f.children ? money(f.perChildPlannedCad, "CAD") : "—"]);
+      familyRows.push(["Forecast per child", f.children ? money(f.perChildPlannedCad, "CAD") : "—"]);
       familyRows.push(["Paid per child", f.children ? money(f.perChildPaidCad, "CAD") : "—"]);
     }
     el.reportFamilySummary.innerHTML = `
@@ -2147,7 +2121,7 @@ function renderReport(summary) {
     <div class="report-table">
       <div class="report-table-row header">
         <div>Category</div>
-        <div>Planned (CDN)</div>
+        <div>Forecast (CDN)</div>
         <div>Paid (CDN)</div>
         <div>Paid %</div>
       </div>
@@ -2183,7 +2157,7 @@ function renderReport(summary) {
                 ${item.notes ? `<p class="muted">${escapeHtml(item.notes)}</p>` : ""}
               </div>
               <div class="timeline-cost">
-                <strong>Planned ${formatEnteredMoney(item.plannedUsd, item.currency)}</strong>
+                <strong>Forecast ${formatEnteredMoney(item.plannedUsd, item.currency)}</strong>
                 <span>Paid ${formatEnteredMoney(item.paidUsd, item.currency)}</span>
                 <span class="muted">${money(amountToCad(item.plannedUsd, item.currency), "CAD")} planned</span>
               </div>

@@ -670,6 +670,10 @@ textarea {
   gap: 12px;
 }
 
+.metric-grid[hidden] {
+  display: none !important;
+}
+
 .metric-card {
   border: 1px solid var(--line);
   border-radius: 14px;

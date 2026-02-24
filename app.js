@@ -2540,7 +2540,7 @@ function renderReport(summary) {
     if (!breakdownRows.length) {
       el.reportCharts.innerHTML = `<p class="muted">No cost data yet.</p>`;
     } else {
-      const palette = ["#0f6abf", "#1d8fe1", "#0ea5a8", "#34b3b6", "#6ccf9b", "#7aa2f7", "#9bb5d6"];
+      const palette = ["#0f6abf", "#1d8fe1", "#3b82f6", "#60a5fa", "#7aa2f7", "#9bb5d6", "#c7d7ee"];
       const totalPlanned = summary.plannedCad || 1;
       const segments = breakdownRows.map(([name, data], index) => ({
         name,

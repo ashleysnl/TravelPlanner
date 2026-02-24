@@ -2205,8 +2205,9 @@ td {
   border-radius: 14px;
   padding: 18px;
   background:
-    radial-gradient(circle at 100% 0%, rgba(14, 165, 168, 0.08), transparent 45%),
-    #fff;
+    radial-gradient(circle at 100% 0%, rgba(14, 165, 168, 0.06), transparent 42%),
+    radial-gradient(circle at 0% 0%, rgba(15, 106, 191, 0.06), transparent 38%),
+    linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
 }
 
 .report-top {
@@ -2237,8 +2238,8 @@ td {
 
 .report-note {
   min-width: 240px;
-  background: #f8fbff;
-  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #f7fbff, #ffffff);
+  border: 1px solid #e4edf9;
   border-radius: 12px;
   padding: 10px 12px;
 }
@@ -2256,9 +2257,10 @@ td {
 }
 
 .report-metric {
-  border: 1px solid var(--line);
+  border: 1px solid #e6eef9;
   border-radius: 12px;
   padding: 10px;
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .report-metric .label {
@@ -2278,6 +2280,7 @@ td {
 .report-section h4 {
   margin: 0 0 8px;
   font-size: 0.95rem;
+  color: #113a6b;
 }
 
 .report-charts {
@@ -2292,15 +2295,16 @@ td {
 }
 
 .report-chart-card {
-  border: 1px solid var(--line);
+  border: 1px solid #e4edf9;
   border-radius: 12px;
   padding: 10px;
-  background: #fff;
+  background: linear-gradient(180deg, #ffffff, #fbfdff);
 }
 
 .report-chart-card h5 {
   margin: 0 0 8px;
   font-size: 0.84rem;
+  color: #113a6b;
 }
 
 .report-chart-bars {
@@ -2326,7 +2330,7 @@ td {
 .report-chart-bar-track {
   height: 8px;
   border-radius: 999px;
-  background: #edf2fb;
+  background: #eef4fc;
   overflow: hidden;
 }
 
@@ -2363,8 +2367,8 @@ td {
   position: absolute;
   inset: 22px;
   border-radius: 50%;
-  border: 1px solid var(--line);
-  background: #fff;
+  border: 1px solid #e4edf9;
+  background: linear-gradient(180deg, #ffffff, #fbfdff);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -2411,9 +2415,9 @@ td {
 }
 
 .report-calendar-day {
-  border: 1px solid var(--line);
+  border: 1px solid #e6eef9;
   border-radius: 12px;
-  background: #fff;
+  background: linear-gradient(180deg, #ffffff, #fbfdff);
   padding: 10px;
   break-inside: avoid;
 }
@@ -2431,7 +2435,7 @@ td {
 }
 
 .report-calendar-day-head span {
-  color: var(--muted);
+  color: #5f738d;
   font-size: 0.74rem;
 }
 
@@ -2464,9 +2468,10 @@ td {
 
 .report-table {
   width: 100%;
-  border: 1px solid var(--line);
+  border: 1px solid #e4edf9;
   border-radius: 12px;
   overflow: hidden;
+  background: #fff;
 }
 
 .report-table-row {
@@ -2484,8 +2489,8 @@ td {
 
 .report-table-row.header {
   font-weight: 700;
-  background: #f8fbff;
-  color: var(--muted);
+  background: linear-gradient(180deg, #f6faff, #f9fcff);
+  color: #5f738d;
 }
 
 .report-table-row.two-col {
@@ -2498,8 +2503,9 @@ td {
 }
 
 .timeline-item {
-  border: 1px solid var(--line);
+  border: 1px solid #e6eef9;
   border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff, #fbfdff);
   padding: 10px 12px;
   display: grid;
   grid-template-columns: 140px 1fr 160px;
@@ -2530,7 +2536,7 @@ td {
 
 .timeline-cost strong {
   display: block;
-  color: var(--ink);
+  color: #113a6b;
   font-size: 0.9rem;
 }
 

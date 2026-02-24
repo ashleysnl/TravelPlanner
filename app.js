@@ -547,6 +547,15 @@ function money(value, currency = "USD") {
   }).format(Number(value) || 0);
 }
 
+function moneyRounded(value, currency = "USD") {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.round(Number(value) || 0));
+}
+
 function compactCad(value) {
   const v = Math.abs(Number(value) || 0);
   const sign = Number(value) < 0 ? "-" : "";
@@ -1749,17 +1758,17 @@ function renderTripSnapshot(summary) {
   const snapshotItems = [
     {
       label: "Budget",
-      value: Number(summary.budgetCad) > 0 ? money(summary.budgetCad, "CAD") : "—",
+      value: Number(summary.budgetCad) > 0 ? moneyRounded(summary.budgetCad, "CAD") : "—",
       sub: Number(summary.budgetCad) > 0 ? "Trip budget" : "Set budget in Settings",
     },
     {
       label: "Forecasted Cost",
-      value: hasCosts ? money(summary.plannedCad, "CAD") : "—",
+      value: hasCosts ? moneyRounded(summary.plannedCad, "CAD") : "—",
       sub: hasCosts ? "Forecast total" : "Add costs to calculate",
     },
     {
       label: "Paid to Date",
-      value: hasCosts ? money(summary.paidCad, "CAD") : "—",
+      value: hasCosts ? moneyRounded(summary.paidCad, "CAD") : "—",
       sub: hasCosts ? "Paid so far" : "Add costs to calculate",
     },
     {

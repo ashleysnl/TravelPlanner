@@ -145,23 +145,45 @@ body {
   justify-content: center;
 }
 
-.global-save-btn {
+.global-fab-row {
   position: fixed;
   top: calc(12px + env(safe-area-inset-top, 0px));
   right: calc(12px + env(safe-area-inset-right, 0px));
   z-index: 1100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.global-support-btn,
+.global-save-btn {
   border: 1px solid rgba(255, 255, 255, 0.35);
-  background: linear-gradient(135deg, #0f6abf, #0ea5a8);
   color: #fff;
   border-radius: 999px;
   padding: 9px 12px;
   font-weight: 800;
   font-size: 0.8rem;
-  cursor: pointer;
   box-shadow: 0 10px 24px rgba(15, 106, 191, 0.25);
 }
 
+.global-support-btn {
+  background: linear-gradient(135deg, #16a34a, #0ea5a8);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.global-save-btn {
+  background: linear-gradient(135deg, #0f6abf, #0ea5a8);
+  cursor: pointer;
+}
+
 .global-save-btn:active {
+  transform: translateY(1px);
+}
+
+.global-support-btn:active {
   transform: translateY(1px);
 }
 
@@ -1736,9 +1758,14 @@ td {
     font-size: 0.74rem;
   }
 
-  .global-save-btn {
+  .global-fab-row {
     top: calc(10px + env(safe-area-inset-top, 0px));
     right: calc(10px + env(safe-area-inset-right, 0px));
+    gap: 6px;
+  }
+
+  .global-support-btn,
+  .global-save-btn {
     padding: 8px 10px;
     font-size: 0.74rem;
   }

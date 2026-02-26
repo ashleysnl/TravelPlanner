@@ -881,15 +881,24 @@ function handleSetupWizardClick(event) {
 
 function buildEmptyState() {
   let existingCustomCategories = [];
+  let adultsSeed = 2;
+  let childrenSeed = 0;
   try {
     existingCustomCategories = Array.isArray(state?.settings?.customCategories) ? state.settings.customCategories : [];
   } catch {
     existingCustomCategories = [];
   }
+  try {
+    adultsSeed = Math.max(0, Number(familyPrefs?.adults) || Number(localStorage.getItem(FAMILY_ADULTS_KEY)) || 2);
+    childrenSeed = Math.max(0, Number(familyPrefs?.children) || Number(localStorage.getItem(FAMILY_CHILDREN_KEY)) || 0);
+  } catch {
+    adultsSeed = 2;
+    childrenSeed = 0;
+  }
   return normalizeImportedState({
     settings: {
       tripName: "",
-      travelers: Math.max(1, (Number(familyPrefs.adults) || 0) + (Number(familyPrefs.children) || 0) || 2),
+      travelers: Math.max(1, adultsSeed + childrenSeed || 2),
       startDate: "",
       endDate: "",
       totalBudgetCad: 0,

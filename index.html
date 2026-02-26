@@ -16,7 +16,9 @@
         <p class="hero-subtitle">Offline • No login • Your data stays on your device</p>
         <p class="hero-proof">Private, local-first trip planning. No cloud. No tracking.</p>
         <div class="hero-cta-row no-print">
-          <button id="startPlanningBtn" class="btn btn-primary" type="button">Open Trip</button>
+          <button id="startPlanningBtn" class="btn btn-primary" type="button">Start Planning</button>
+          <button id="heroLoadDemoBtn" class="btn btn-secondary control-btn" type="button">Load Demo Trip</button>
+          <button id="openTripBtn" class="btn btn-secondary control-btn" type="button">Open Trip</button>
           <a
             class="btn btn-secondary control-btn support-link-btn"
             href="https://buymeacoffee.com/ashleysnl"
@@ -41,6 +43,8 @@
         <button id="aboutAppBtn" type="button" class="btn btn-secondary control-btn">About</button>
       </div>
     </header>
+
+    <section id="setupWizardCard" class="setup-wizard-card no-print" hidden aria-labelledby="setupWizardTitle"></section>
 
     <section class="trip-snapshot" aria-labelledby="tripSnapshotTitle">
       <div class="trip-snapshot-head">
@@ -407,8 +411,8 @@
         <div class="subsection no-print backup-tools">
           <h3>Backup</h3>
           <div class="backup-actions">
-            <button id="exportJsonBtn" type="button" class="btn btn-primary">Export JSON Backup</button>
-            <button id="importJsonBtn" type="button" class="btn btn-secondary control-btn">Import JSON Backup</button>
+            <button id="exportJsonBtn" type="button" class="btn btn-primary">Save Trip</button>
+            <button id="importJsonBtn" type="button" class="btn btn-secondary control-btn">Load Trip</button>
             <input id="importJsonFile" type="file" accept="application/json,.json" hidden />
           </div>
           <div class="backup-status">

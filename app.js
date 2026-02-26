@@ -10,6 +10,7 @@ const FAMILY_SPLIT_TOGGLE_KEY = "travelplanner_family_split_toggle";
 const ONBOARDING_DISMISSED_KEY = "travelplanner_onboarding_dismissed";
 const ITIN_FORM_MODE_KEY = "travelplanner_itin_form_mode";
 const COST_FORM_MODE_KEY = "travelplanner_cost_form_mode";
+const BLANK_DEFAULT_MIGRATION_KEY = "travelplanner_blank_default_migration_v1";
 
 function makeId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -258,6 +259,9 @@ const uiState = {
   supportBannerVisible: false,
   toastTimer: null,
   onboardingVisible: false,
+  setupWizardVisible: false,
+  setupWizardMinimized: false,
+  setupWizardStep: 1,
   appReady: false,
   dashboardQuickEdit: null,
   dashboardQuickPlacement: null,
@@ -267,6 +271,45 @@ const uiState = {
   costItemEditId: null,
 };
 let bodyScrollLockY = 0;
+
+function isLegacySeededDemoState(candidate) {
+  const source = candidate || state;
+  if (!source?.settings) return false;
+  if (String(source.settings.tripName || "") !== String(demoData.settings.tripName || "")) return false;
+  if ((source.settings.startDate || "") !== (demoData.settings.startDate || "")) return false;
+  if ((source.settings.endDate || "") !== (demoData.settings.endDate || "")) return false;
+  if (Math.round(Number(source.settings.totalBudgetCad) || 0) !== Math.round(Number(demoData.settings.totalBudgetCad) || 0)) return false;
+
+  const sourceActivities = Array.isArray(source.activities) ? source.activities : [];
+  const sourceCosts = Array.isArray(source.costItems) ? source.costItems : [];
+  if (sourceActivities.length !== demoData.activities.length) return false;
+  if (sourceCosts.length !== demoData.costItems.length) return false;
+
+  const activitySignature = (item) => [item.date || "", item.time || "", item.title || "", item.location || "", item.category || ""].join("|");
+  const costSignature = (item) =>
+    [item.title || "", item.category || "", item.itineraryDate || "", item.itineraryTime || "", item.includeInItinerary ? "1" : "0"].join("|");
+
+  return (
+    sourceActivities.every((item, idx) => activitySignature(item) === activitySignature(demoData.activities[idx])) &&
+    sourceCosts.every((item, idx) => costSignature(item) === costSignature(demoData.costItems[idx]))
+  );
+}
+
+function migrateLegacySeededDemoToBlank() {
+  try {
+    if (localStorage.getItem(BLANK_DEFAULT_MIGRATION_KEY) === "1") return;
+    if (!isLegacySeededDemoState(state)) {
+      localStorage.setItem(BLANK_DEFAULT_MIGRATION_KEY, "1");
+      return;
+    }
+
+    state = buildEmptyState();
+    saveState(false);
+    localStorage.setItem(BLANK_DEFAULT_MIGRATION_KEY, "1");
+  } catch {
+    // Ignore migration failures and continue with current state.
+  }
+}
 
 const el = {
   settingsForm: document.getElementById("settingsForm"),
@@ -287,6 +330,8 @@ const el = {
   importJsonFile: document.getElementById("importJsonFile"),
   globalSaveBtn: document.getElementById("globalSaveBtn"),
   startPlanningBtn: document.getElementById("startPlanningBtn"),
+  heroLoadDemoBtn: document.getElementById("heroLoadDemoBtn"),
+  openTripBtn: document.getElementById("openTripBtn"),
   importReminderModal: document.getElementById("importReminderModal"),
   importReminderImportBtn: document.getElementById("importReminderImportBtn"),
   importReminderDismissBtn: document.getElementById("importReminderDismissBtn"),
@@ -325,6 +370,7 @@ const el = {
   dashboardTripMeta: document.getElementById("dashboardTripMeta"),
   dashboardCategoryBreakdownTitle: document.getElementById("dashboardCategoryBreakdownTitle"),
   tripSnapshotGrid: document.getElementById("tripSnapshotGrid"),
+  setupWizardCard: document.getElementById("setupWizardCard"),
   dashboardTimelineRange: document.getElementById("dashboardTimelineRange"),
   appToast: document.getElementById("appToast"),
   itineraryComposer: document.getElementById("itineraryComposer"),
@@ -420,11 +466,11 @@ function loadState() {
   const raw =
     localStorage.getItem(STORAGE_KEY) ||
     LEGACY_STORAGE_KEYS.map((key) => localStorage.getItem(key)).find(Boolean);
-  if (!raw) return normalizeImportedState(demoData);
+  if (!raw) return buildEmptyState();
   try {
     return normalizeImportedState(JSON.parse(raw));
   } catch {
-    return normalizeImportedState(demoData);
+    return buildEmptyState();
   }
 }
 
@@ -456,7 +502,390 @@ function syncOnboardingPanelVisibility() {
   el.onboardingPanel.hidden = !uiState.onboardingVisible;
 }
 
+function setupWizardStepComplete(step, summary = calculateSummary()) {
+  const s = state.settings || {};
+  const travelers = Math.max(0, Number(familyPrefs.adults) || 0) + Math.max(0, Number(familyPrefs.children) || 0);
+  if (step === 1) return Boolean((s.tripName || "").trim() && s.startDate && s.endDate);
+  if (step === 2) return (Number(s.totalBudgetCad) || 0) > 0 && travelers > 0 && Boolean(displayCurrencyCode());
+  if (step === 3) return (state.activities || []).length > 0;
+  if (step === 4) return (state.costItems || []).length > 0;
+  if (step === 5) return uiState.setupWizardMinimized;
+  return false;
+}
+
+function getSetupWizardStepStatuses(summary = calculateSummary()) {
+  return [1, 2, 3, 4, 5].map((step) => ({
+    step,
+    complete: setupWizardStepComplete(step, summary),
+  }));
+}
+
+function openSetupWizard({ step = 1, scroll = true } = {}) {
+  uiState.setupWizardVisible = true;
+  uiState.setupWizardMinimized = false;
+  uiState.setupWizardStep = Math.min(5, Math.max(1, Number(step) || 1));
+  switchTab("dashboard");
+  render();
+  if (scroll && el.setupWizardCard) {
+    requestAnimationFrame(() => el.setupWizardCard.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+}
+
+function minimizeSetupWizard() {
+  uiState.setupWizardVisible = true;
+  uiState.setupWizardMinimized = true;
+  uiState.setupWizardStep = 5;
+}
+
+function closeSetupWizard() {
+  uiState.setupWizardVisible = false;
+  uiState.setupWizardMinimized = false;
+}
+
+function saveSetupWizardBasicsStep() {
+  const tripNameInput = document.getElementById("setupTripName");
+  const startDateInput = document.getElementById("setupStartDate");
+  const endDateInput = document.getElementById("setupEndDate");
+  if (!tripNameInput || !startDateInput || !endDateInput) return false;
+  const tripName = tripNameInput.value.trim();
+  const startDate = startDateInput.value;
+  const endDate = endDateInput.value;
+  if (!tripName || !startDate || !endDate) {
+    showToast("Add trip name and dates to continue.");
+    return false;
+  }
+  if (endDate < startDate) {
+    showToast("End date must be after the start date.");
+    return false;
+  }
+  state.settings.tripName = tripName;
+  state.settings.startDate = startDate;
+  state.settings.endDate = endDate;
+  saveState();
+  return true;
+}
+
+function saveSetupWizardBudgetStep() {
+  const budgetInput = document.getElementById("setupBudget");
+  const currencyInput = document.getElementById("setupDisplayCurrency");
+  const adultsInput = document.getElementById("setupAdults");
+  const childrenInput = document.getElementById("setupChildren");
+  if (!budgetInput || !currencyInput || !adultsInput || !childrenInput) return false;
+
+  const displayCurrency = normalizeDisplayCurrency(currencyInput.value);
+  const budgetDisplay = Math.max(0, Number(budgetInput.value) || 0);
+  const adults = Math.max(0, Number(adultsInput.value) || 0);
+  const children = Math.max(0, Number(childrenInput.value) || 0);
+  const travelers = adults + children;
+  if (travelers <= 0) {
+    showToast("Add at least 1 traveler to continue.");
+    return false;
+  }
+  if (budgetDisplay <= 0) {
+    showToast("Add your budget to continue.");
+    return false;
+  }
+
+  state.settings.displayCurrency = displayCurrency;
+  state.settings.totalBudgetCad = displayToCad(budgetDisplay, displayCurrency);
+  state.settings.travelers = travelers;
+  familyPrefs.adults = adults;
+  familyPrefs.children = children;
+  saveFamilyPrefs();
+  saveState();
+  return true;
+}
+
+function setupWizardReviewRows(summary) {
+  const leftCad = (Number(state.settings.totalBudgetCad) || 0) - (Number(summary.plannedCad) || 0);
+  return [
+    ["Budget", moneyDisplayRoundedFromCad(state.settings.totalBudgetCad || 0)],
+    ["Forecast", moneyDisplayRoundedFromCad(summary.plannedCad || 0)],
+    ["Paid", moneyDisplayRoundedFromCad(summary.paidCad || 0)],
+    ["Remaining", moneyDisplayRoundedFromCad(leftCad)],
+    ["Status", leftCad >= 0 ? "On budget" : "Over budget"],
+  ];
+}
+
+function renderSetupWizard(summary) {
+  if (!el.setupWizardCard) return;
+  const visible = uiState.setupWizardVisible;
+  el.setupWizardCard.hidden = !visible;
+  if (!visible) return;
+
+  const steps = getSetupWizardStepStatuses(summary);
+  const currentStep = Math.min(5, Math.max(1, Number(uiState.setupWizardStep) || 1));
+  const progressPct = Math.round(((currentStep - 1) / 4) * 100);
+
+  if (uiState.setupWizardMinimized) {
+    el.setupWizardCard.classList.add("is-minimized");
+    el.setupWizardCard.innerHTML = `
+      <div class="setup-wizard-minibar">
+        <div>
+          <p class="setup-wizard-kicker">Setup Complete</p>
+          <strong>Trip setup is ready.</strong>
+          <p class="muted small-copy">You can reopen the steps any time to adjust the basics.</p>
+        </div>
+        <div class="setup-wizard-mini-actions">
+          <button type="button" class="btn btn-secondary control-btn" data-action="wizardReopen">Reopen setup</button>
+          <button type="button" class="icon-btn" data-action="wizardClose" aria-label="Close setup summary">Dismiss</button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  el.setupWizardCard.classList.remove("is-minimized");
+
+  const travelers = Math.max(0, Number(familyPrefs.adults) || 0) + Math.max(0, Number(familyPrefs.children) || 0);
+  const stepTitles = [
+    "Trip Basics",
+    "Budget + Travelers",
+    "Build Itinerary",
+    "Add Other Costs",
+    "Review vs Budget",
+  ];
+
+  let bodyHtml = "";
+  let canContinue = true;
+  let nextLabel = currentStep === 5 ? "Finish Setup" : "Continue";
+  let nextAction = currentStep === 5 ? "wizardFinish" : "wizardNext";
+  let secondaryHtml = currentStep > 1 ? `<button type="button" class="btn btn-secondary control-btn" data-action="wizardBack">Back</button>` : "";
+
+  if (currentStep === 1) {
+    canContinue = Boolean((state.settings.tripName || "").trim() && state.settings.startDate && state.settings.endDate);
+    bodyHtml = `
+      <div class="setup-wizard-fields">
+        <label class="form-span-full">
+          Trip name
+          <input id="setupTripName" type="text" value="${escapeHtml(state.settings.tripName || "")}" placeholder="Summer Vacation" />
+        </label>
+        <label>
+          Start date
+          <input id="setupStartDate" type="date" value="${escapeHtml(state.settings.startDate || "")}" />
+        </label>
+        <label>
+          End date
+          <input id="setupEndDate" type="date" value="${escapeHtml(state.settings.endDate || "")}" />
+        </label>
+      </div>
+    `;
+  } else if (currentStep === 2) {
+    canContinue = (Number(state.settings.totalBudgetCad) || 0) > 0 && travelers > 0;
+    bodyHtml = `
+      <div class="setup-wizard-fields">
+        <label>
+          Budget
+          <input id="setupBudget" type="number" min="0" step="0.01" value="${cadToDisplay(state.settings.totalBudgetCad || 0).toFixed(2)}" />
+        </label>
+        <label>
+          Planning currency
+          <select id="setupDisplayCurrency">
+            <option value="USD" ${displayCurrencyCode() === "USD" ? "selected" : ""}>USD</option>
+            <option value="CAD" ${displayCurrencyCode() === "CAD" ? "selected" : ""}>CAD</option>
+            <option value="EUR" ${displayCurrencyCode() === "EUR" ? "selected" : ""}>EUR</option>
+          </select>
+        </label>
+        <label>
+          Adults
+          <input id="setupAdults" type="number" min="0" step="1" value="${Math.max(0, Number(familyPrefs.adults) || 0)}" />
+        </label>
+        <label>
+          Kids
+          <input id="setupChildren" type="number" min="0" step="1" value="${Math.max(0, Number(familyPrefs.children) || 0)}" />
+        </label>
+      </div>
+    `;
+  } else if (currentStep === 3) {
+    canContinue = (state.activities || []).length > 0;
+    nextLabel = canContinue ? "Continue" : "Skip for now";
+    const wizardItinFormOpen = uiState.itineraryFormPlacement?.type === "wizard-new";
+    bodyHtml = `
+      <div class="setup-wizard-step-note">
+        <p><strong>${(state.activities || []).length}</strong> itinerary item${(state.activities || []).length === 1 ? "" : "s"} added.</p>
+        <p class="muted">Start by adding flights, hotel, and one activity. You can add more later.</p>
+      </div>
+      <div class="setup-wizard-inline-actions">
+        <button type="button" class="btn btn-primary" data-action="wizardOpenItinerary">${wizardItinFormOpen ? "Hide itinerary form" : "Add itinerary item"}</button>
+        <button type="button" class="btn btn-secondary control-btn" data-action="wizardJumpTab" data-tab="itinerary">Open full Itinerary tab</button>
+      </div>
+      <div class="setup-wizard-form-slot" data-inline-slot="wizard-itinerary-new"></div>
+    `;
+  } else if (currentStep === 4) {
+    canContinue = (state.costItems || []).length > 0;
+    nextLabel = canContinue ? "Continue" : "Skip for now";
+    const wizardCostFormOpen = uiState.costFormPlacement?.type === "wizard-new";
+    bodyHtml = `
+      <div class="setup-wizard-step-note">
+        <p><strong>${(state.costItems || []).length}</strong> other cost item${(state.costItems || []).length === 1 ? "" : "s"} added.</p>
+        <p class="muted">Add insurance, parking, supplies, or any costs that are not activities.</p>
+      </div>
+      <div class="setup-wizard-inline-actions">
+        <button type="button" class="btn btn-primary" data-action="wizardOpenCosts">${wizardCostFormOpen ? "Hide cost form" : "Add other cost"}</button>
+        <button type="button" class="btn btn-secondary control-btn" data-action="wizardJumpTab" data-tab="costs">Open full Costs tab</button>
+      </div>
+      <div class="setup-wizard-form-slot" data-inline-slot="wizard-cost-new"></div>
+    `;
+  } else {
+    const rows = setupWizardReviewRows(summary)
+      .map(
+        ([label, value]) => `
+          <div class="setup-wizard-review-row">
+            <span>${escapeHtml(label)}</span>
+            <strong>${escapeHtml(value)}</strong>
+          </div>
+        `
+      )
+      .join("");
+    bodyHtml = `
+      <div class="setup-wizard-step-note">
+        <p class="muted">Quick review before you start working in the planner tabs.</p>
+      </div>
+      <div class="setup-wizard-review">${rows}</div>
+      <div class="setup-wizard-inline-actions">
+        <button type="button" class="btn btn-secondary control-btn" data-action="wizardJumpTab" data-tab="dashboard">Open Dashboard</button>
+        <button type="button" class="btn btn-secondary control-btn" data-action="wizardJumpTab" data-tab="report">Open Report</button>
+      </div>
+    `;
+  }
+
+  el.setupWizardCard.innerHTML = `
+    <div class="setup-wizard-shell" role="region" aria-labelledby="setupWizardTitle">
+      <div class="setup-wizard-head">
+        <div>
+          <p class="setup-wizard-kicker">Guided Setup</p>
+          <h3 id="setupWizardTitle">Start Planning in 5 steps</h3>
+          <p class="muted">Add the basics now. You can refine everything later.</p>
+        </div>
+        <button type="button" class="icon-btn" data-action="wizardMinimize" aria-label="Minimize setup card">Minimize</button>
+      </div>
+      <div class="setup-wizard-progress" aria-label="Setup progress">
+        <div class="setup-wizard-progress-bar" aria-hidden="true">
+          <span style="width:${progressPct}%"></span>
+        </div>
+        <div class="setup-wizard-steps">
+          ${steps
+            .map(
+              ({ step, complete }) => `
+                <button type="button" class="setup-step-chip ${step === currentStep ? "is-active" : ""} ${complete ? "is-complete" : ""}" data-action="wizardGoStep" data-step="${step}" aria-label="Step ${step}: ${stepTitles[step - 1]}">
+                  <span class="dot">${complete ? "✓" : step}</span>
+                  <span class="label">${stepTitles[step - 1]}</span>
+                </button>
+              `
+            )
+            .join("")}
+        </div>
+      </div>
+      <div class="setup-wizard-body">
+        <div class="setup-wizard-step-title">
+          <span>Step ${currentStep} of 5</span>
+          <strong>${stepTitles[currentStep - 1]}</strong>
+        </div>
+        ${bodyHtml}
+      </div>
+      <div class="setup-wizard-footer">
+        <div class="setup-wizard-footer-left">
+          ${secondaryHtml}
+        </div>
+        <div class="setup-wizard-footer-right">
+          <button type="button" class="btn btn-secondary control-btn" data-action="wizardClose">Close</button>
+          <button type="button" class="btn btn-primary" data-action="${nextAction}">${nextLabel}</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function handleSetupWizardClick(event) {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+  const action = button.dataset.action;
+  if (!action) return;
+
+  if (action === "wizardClose") {
+    closeSetupWizard();
+    render();
+    return;
+  }
+  if (action === "wizardMinimize") {
+    minimizeSetupWizard();
+    render();
+    return;
+  }
+  if (action === "wizardReopen") {
+    uiState.setupWizardVisible = true;
+    uiState.setupWizardMinimized = false;
+    render();
+    return;
+  }
+  if (action === "wizardBack") {
+    uiState.setupWizardStep = Math.max(1, uiState.setupWizardStep - 1);
+    render();
+    return;
+  }
+  if (action === "wizardGoStep") {
+    uiState.setupWizardStep = Math.min(5, Math.max(1, Number(button.dataset.step) || 1));
+    render();
+    return;
+  }
+  if (action === "wizardJumpTab") {
+    switchTab(button.dataset.tab || "dashboard");
+    render();
+    return;
+  }
+  if (action === "wizardOpenItinerary") {
+    let shouldFocus = false;
+    if (uiState.itineraryFormPlacement?.type === "wizard-new") {
+      hideItineraryInlineForm();
+    } else {
+      showItineraryNewItemFormInWizard();
+      shouldFocus = true;
+      if (uiState.costFormPlacement?.type === "wizard-new") {
+        hideCostInlineForm();
+        resetCostItemForm();
+      }
+    }
+    render();
+    if (shouldFocus) requestAnimationFrame(() => el.activityInputs.title?.focus());
+    return;
+  }
+  if (action === "wizardOpenCosts") {
+    let shouldFocus = false;
+    if (uiState.costFormPlacement?.type === "wizard-new") {
+      hideCostInlineForm();
+    } else {
+      showCostNewItemFormInWizard();
+      shouldFocus = true;
+      if (uiState.itineraryFormPlacement?.type === "wizard-new") {
+        hideItineraryInlineForm();
+        resetActivityForm();
+      }
+    }
+    render();
+    if (shouldFocus) requestAnimationFrame(() => el.costItemInputs.title?.focus());
+    return;
+  }
+  if (action === "wizardNext") {
+    if (uiState.setupWizardStep === 1 && !saveSetupWizardBasicsStep()) return;
+    if (uiState.setupWizardStep === 2 && !saveSetupWizardBudgetStep()) return;
+    uiState.setupWizardStep = Math.min(5, uiState.setupWizardStep + 1);
+    render();
+    return;
+  }
+  if (action === "wizardFinish") {
+    minimizeSetupWizard();
+    switchTab("dashboard");
+    render();
+  }
+}
+
 function buildEmptyState() {
+  let existingCustomCategories = [];
+  try {
+    existingCustomCategories = Array.isArray(state?.settings?.customCategories) ? state.settings.customCategories : [];
+  } catch {
+    existingCustomCategories = [];
+  }
   return normalizeImportedState({
     settings: {
       tripName: "",
@@ -467,13 +896,15 @@ function buildEmptyState() {
       displayCurrency: "USD",
       usdToCadRate: 1.36,
       eurToCadRate: 1.47,
-      customCategories: state?.settings?.customCategories || [],
+      customCategories: existingCustomCategories,
     },
     activities: [],
     costItems: [],
     meta: {},
   });
 }
+
+migrateLegacySeededDemoToBlank();
 
 function saveState(markDirty = true) {
   if (markDirty) {
@@ -960,10 +1391,7 @@ function syncFamilyPrefsFromTravelerCount(travelerCount) {
 }
 
 function startPlanningFromHero() {
-  switchTab("itinerary");
-  showItineraryNewItemForm();
-  render();
-  requestAnimationFrame(() => el.activityInputs.title?.focus());
+  openSetupWizard({ step: 1, scroll: true });
 }
 
 function loadSampleTripFromOnboarding() {
@@ -975,8 +1403,7 @@ function startEmptyTripFromOnboarding() {
   localStorage.setItem(ONBOARDING_DISMISSED_KEY, "1");
   uiState.onboardingVisible = false;
   saveState();
-  switchTab("settings");
-  render();
+  openSetupWizard({ step: 1, scroll: true });
 }
 
 function handleAboutModalClick(event) {
@@ -1214,6 +1641,14 @@ function showItineraryNewItemFormForDate(date) {
   el.activityFormCancelEdit.hidden = false;
 }
 
+function showItineraryNewItemFormInWizard() {
+  uiState.itineraryFormPlacement = { type: "wizard-new" };
+  resetActivityForm();
+  uiState.itineraryFormPlacement = { type: "wizard-new" };
+  el.activityFormCancelEdit.textContent = "Cancel";
+  el.activityFormCancelEdit.hidden = false;
+}
+
 function hideItineraryInlineForm() {
   uiState.itineraryFormPlacement = null;
   uiState.itineraryEditId = null;
@@ -1234,6 +1669,8 @@ function mountItineraryFormInline() {
   let slot = null;
   if (placement.type === "new") {
     slot = composer.querySelector('[data-inline-slot="new"]');
+  } else if (placement.type === "wizard-new") {
+    slot = el.setupWizardCard?.querySelector('[data-inline-slot="wizard-itinerary-new"]') || null;
   } else if (placement.type === "new-day" && placement.date) {
     slot = list.querySelector(`[data-inline-slot="day-new"][data-date="${placement.date}"]`);
   } else if (placement.type === "edit-cost-hub" && placement.id) {
@@ -1425,6 +1862,11 @@ function renderItineraryList(summary) {
     uiState.itineraryFormPlacement = { type: "new" };
     el.activityFormCancelEdit.textContent = "Cancel";
     el.activityFormCancelEdit.hidden = false;
+  } else if (uiState.itineraryFormPlacement?.type === "wizard-new") {
+    resetActivityForm();
+    uiState.itineraryFormPlacement = { type: "wizard-new" };
+    el.activityFormCancelEdit.textContent = "Cancel";
+    el.activityFormCancelEdit.hidden = false;
   } else if (uiState.itineraryFormPlacement?.type === "new-day") {
     const targetDate = uiState.itineraryFormPlacement.date || "";
     resetActivityForm();
@@ -1490,6 +1932,14 @@ function showCostNewItemForm() {
   el.costItemFormCancelEdit.hidden = false;
 }
 
+function showCostNewItemFormInWizard() {
+  uiState.costFormPlacement = { type: "wizard-new" };
+  resetCostItemForm();
+  uiState.costFormPlacement = { type: "wizard-new" };
+  el.costItemFormCancelEdit.textContent = "Cancel";
+  el.costItemFormCancelEdit.hidden = false;
+}
+
 function hideCostInlineForm() {
   uiState.costFormPlacement = null;
   uiState.costItemEditId = null;
@@ -1509,6 +1959,8 @@ function mountCostFormInline() {
   let slot = null;
   if (placement.type === "new") {
     slot = composer.querySelector('[data-inline-slot="new"]');
+  } else if (placement.type === "wizard-new") {
+    slot = el.setupWizardCard?.querySelector('[data-inline-slot="wizard-cost-new"]') || null;
   } else if (placement.type === "edit" && placement.id) {
     slot = list.querySelector(`[data-inline-slot="edit"][data-item-id="${placement.id}"]`);
   }
@@ -1706,6 +2158,11 @@ function renderCostsList(summary) {
   } else if (uiState.costFormPlacement?.type === "new") {
     resetCostItemForm();
     uiState.costFormPlacement = { type: "new" };
+    el.costItemFormCancelEdit.textContent = "Cancel";
+    el.costItemFormCancelEdit.hidden = false;
+  } else if (uiState.costFormPlacement?.type === "wizard-new") {
+    resetCostItemForm();
+    uiState.costFormPlacement = { type: "wizard-new" };
     el.costItemFormCancelEdit.textContent = "Cancel";
     el.costItemFormCancelEdit.hidden = false;
   } else {
@@ -2806,6 +3263,7 @@ function render() {
   syncFormModes();
   const summary = calculateSummary();
   renderTripSnapshot(summary);
+  renderSetupWizard(summary);
   renderDashboard(summary);
   renderItineraryList(summary);
   renderCostsList(summary);
@@ -3443,11 +3901,16 @@ el.dashboardItinerary.addEventListener("keydown", handleDashboardTimelineKeydown
 el.dashboardDayDetail.addEventListener("click", handleDashboardDayModalClick);
 el.printReportBtn.addEventListener("click", () => window.print());
 el.resetDemoBtn.addEventListener("click", resetDemoData);
-el.startPlanningBtn?.addEventListener("click", () => openImportPicker({ confirmReplace: true }));
+el.startPlanningBtn?.addEventListener("click", startPlanningFromHero);
+el.heroLoadDemoBtn?.addEventListener("click", () =>
+  loadSampleTrip({ dismissOnboarding: true, targetTab: "dashboard", confirmReplace: true })
+);
+el.openTripBtn?.addEventListener("click", () => openImportPicker({ confirmReplace: true }));
 el.loadSampleTripBtn?.addEventListener("click", loadSampleTripFromOnboarding);
 el.startEmptyTripBtn?.addEventListener("click", startEmptyTripFromOnboarding);
 el.onboardingImportBackupBtn?.addEventListener("click", () => openImportPicker({ confirmReplace: false }));
 el.dismissOnboardingBtn?.addEventListener("click", dismissOnboardingPanelOnly);
+el.setupWizardCard?.addEventListener("click", handleSetupWizardClick);
 el.aboutAppBtn?.addEventListener("click", openAboutModal);
 el.footerAboutBtn?.addEventListener("click", openAboutModal);
 el.exportJsonBtn.addEventListener("click", exportJsonBackup);

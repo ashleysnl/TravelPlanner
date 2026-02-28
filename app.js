@@ -11,6 +11,26 @@ const ONBOARDING_DISMISSED_KEY = "travelplanner_onboarding_dismissed";
 const ITIN_FORM_MODE_KEY = "travelplanner_itin_form_mode";
 const COST_FORM_MODE_KEY = "travelplanner_cost_form_mode";
 const BLANK_DEFAULT_MIGRATION_KEY = "travelplanner_blank_default_migration_v1";
+const memoryStorageFallback = new Map();
+
+function storageGet(key) {
+  try {
+    const value = localStorage.getItem(key);
+    return value == null ? memoryStorageFallback.get(key) ?? null : value;
+  } catch {
+    return memoryStorageFallback.get(key) ?? null;
+  }
+}
+
+function storageSet(key, value) {
+  const next = String(value);
+  memoryStorageFallback.set(key, next);
+  try {
+    localStorage.setItem(key, next);
+  } catch {
+    // Ignore storage write failures (e.g., private mode); app remains usable in-memory.
+  }
+}
 
 function makeId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -297,15 +317,15 @@ function isLegacySeededDemoState(candidate) {
 
 function migrateLegacySeededDemoToBlank() {
   try {
-    if (localStorage.getItem(BLANK_DEFAULT_MIGRATION_KEY) === "1") return;
+    if (storageGet(BLANK_DEFAULT_MIGRATION_KEY) === "1") return;
     if (!isLegacySeededDemoState(state)) {
-      localStorage.setItem(BLANK_DEFAULT_MIGRATION_KEY, "1");
+      storageSet(BLANK_DEFAULT_MIGRATION_KEY, "1");
       return;
     }
 
     state = buildEmptyState();
     saveState(false);
-    localStorage.setItem(BLANK_DEFAULT_MIGRATION_KEY, "1");
+    storageSet(BLANK_DEFAULT_MIGRATION_KEY, "1");
   } catch {
     // Ignore migration failures and continue with current state.
   }
@@ -464,8 +484,8 @@ const el = {
 
 function loadState() {
   const raw =
-    localStorage.getItem(STORAGE_KEY) ||
-    LEGACY_STORAGE_KEYS.map((key) => localStorage.getItem(key)).find(Boolean);
+    storageGet(STORAGE_KEY) ||
+    LEGACY_STORAGE_KEYS.map((key) => storageGet(key)).find(Boolean);
   if (!raw) return buildEmptyState();
   try {
     return normalizeImportedState(JSON.parse(raw));
@@ -475,24 +495,24 @@ function loadState() {
 }
 
 function loadFamilyPrefs() {
-  const adults = Math.max(0, Number(localStorage.getItem(FAMILY_ADULTS_KEY)) || 2);
-  const children = Math.max(0, Number(localStorage.getItem(FAMILY_CHILDREN_KEY)) || 0);
-  const splitByRole = localStorage.getItem(FAMILY_SPLIT_TOGGLE_KEY) === "1";
+  const adults = Math.max(0, Number(storageGet(FAMILY_ADULTS_KEY)) || 2);
+  const children = Math.max(0, Number(storageGet(FAMILY_CHILDREN_KEY)) || 0);
+  const splitByRole = storageGet(FAMILY_SPLIT_TOGGLE_KEY) === "1";
   return { adults, children, splitByRole };
 }
 
 function saveFamilyPrefs() {
-  localStorage.setItem(FAMILY_ADULTS_KEY, String(Math.max(0, Number(familyPrefs.adults) || 0)));
-  localStorage.setItem(FAMILY_CHILDREN_KEY, String(Math.max(0, Number(familyPrefs.children) || 0)));
-  localStorage.setItem(FAMILY_SPLIT_TOGGLE_KEY, familyPrefs.splitByRole ? "1" : "0");
+  storageSet(FAMILY_ADULTS_KEY, String(Math.max(0, Number(familyPrefs.adults) || 0)));
+  storageSet(FAMILY_CHILDREN_KEY, String(Math.max(0, Number(familyPrefs.children) || 0)));
+  storageSet(FAMILY_SPLIT_TOGGLE_KEY, familyPrefs.splitByRole ? "1" : "0");
 }
 
 function isOnboardingDismissed() {
-  return localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "1";
+  return storageGet(ONBOARDING_DISMISSED_KEY) === "1";
 }
 
 function dismissOnboarding() {
-  localStorage.setItem(ONBOARDING_DISMISSED_KEY, "1");
+  storageSet(ONBOARDING_DISMISSED_KEY, "1");
   uiState.onboardingVisible = false;
   render();
 }
@@ -889,8 +909,8 @@ function buildEmptyState() {
     existingCustomCategories = [];
   }
   try {
-    adultsSeed = Math.max(0, Number(familyPrefs?.adults) || Number(localStorage.getItem(FAMILY_ADULTS_KEY)) || 2);
-    childrenSeed = Math.max(0, Number(familyPrefs?.children) || Number(localStorage.getItem(FAMILY_CHILDREN_KEY)) || 0);
+    adultsSeed = Math.max(0, Number(familyPrefs?.adults) || Number(storageGet(FAMILY_ADULTS_KEY)) || 2);
+    childrenSeed = Math.max(0, Number(familyPrefs?.children) || Number(storageGet(FAMILY_CHILDREN_KEY)) || 0);
   } catch {
     adultsSeed = 2;
     childrenSeed = 0;
@@ -921,7 +941,7 @@ function saveState(markDirty = true) {
     state.meta.backup = state.meta.backup || {};
     state.meta.backup.lastDataChangeAt = new Date().toISOString();
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  storageSet(STORAGE_KEY, JSON.stringify(state));
   if (markDirty) {
     maybeQueueSupportBannerAfterMeaningfulAction();
   }
@@ -1101,7 +1121,7 @@ function compactCad(value) {
 }
 
 function loadStoredFormMode(key) {
-  const saved = String(localStorage.getItem(key) || "").toLowerCase();
+  const saved = String(storageGet(key) || "").toLowerCase();
   return saved === "advanced" ? "advanced" : "basic";
 }
 
@@ -1150,13 +1170,13 @@ function getCostFormUiMode() {
 
 function setItineraryFormUiMode(mode) {
   const normalized = mode === "advanced" ? "advanced" : "basic";
-  localStorage.setItem(ITIN_FORM_MODE_KEY, normalized);
+  storageSet(ITIN_FORM_MODE_KEY, normalized);
   applyFormMode(el.activityForm, normalized, el.activityFormModeButtons);
 }
 
 function setCostFormUiMode(mode) {
   const normalized = mode === "advanced" ? "advanced" : "basic";
-  localStorage.setItem(COST_FORM_MODE_KEY, normalized);
+  storageSet(COST_FORM_MODE_KEY, normalized);
   applyFormMode(el.costItemForm, normalized, el.costItemFormModeButtons);
 }
 
@@ -1230,7 +1250,7 @@ function renderBackupUi() {
 
 function isSupportBannerDismissed() {
   try {
-    return localStorage.getItem(SUPPORT_BANNER_DISMISSED_KEY) === "1";
+    return storageGet(SUPPORT_BANNER_DISMISSED_KEY) === "1";
   } catch {
     return false;
   }
@@ -1238,7 +1258,7 @@ function isSupportBannerDismissed() {
 
 function hasSupportBannerShown() {
   try {
-    return localStorage.getItem(SUPPORT_BANNER_SHOWN_KEY) === "1";
+    return storageGet(SUPPORT_BANNER_SHOWN_KEY) === "1";
   } catch {
     return false;
   }
@@ -1246,7 +1266,7 @@ function hasSupportBannerShown() {
 
 function markSupportBannerShown() {
   try {
-    localStorage.setItem(SUPPORT_BANNER_SHOWN_KEY, "1");
+    storageSet(SUPPORT_BANNER_SHOWN_KEY, "1");
   } catch {
     // Ignore storage errors; banner will simply be less persistent.
   }
@@ -1254,7 +1274,7 @@ function markSupportBannerShown() {
 
 function markSupportBannerDismissed() {
   try {
-    localStorage.setItem(SUPPORT_BANNER_DISMISSED_KEY, "1");
+    storageSet(SUPPORT_BANNER_DISMISSED_KEY, "1");
   } catch {
     // Ignore storage errors; banner will simply be less persistent.
   }
@@ -1409,7 +1429,7 @@ function loadSampleTripFromOnboarding() {
 
 function startEmptyTripFromOnboarding() {
   state = buildEmptyState();
-  localStorage.setItem(ONBOARDING_DISMISSED_KEY, "1");
+  storageSet(ONBOARDING_DISMISSED_KEY, "1");
   uiState.onboardingVisible = false;
   saveState();
   openSetupWizard({ step: 1, scroll: true });
@@ -2723,7 +2743,7 @@ function loadSampleTrip({ dismissOnboarding = false, targetTab = "dashboard", co
   familyPrefs = { adults: 2, children: 2, splitByRole: true };
   saveFamilyPrefs();
   if (dismissOnboarding) {
-    localStorage.setItem(ONBOARDING_DISMISSED_KEY, "1");
+    storageSet(ONBOARDING_DISMISSED_KEY, "1");
     uiState.onboardingVisible = false;
   }
   saveState();
@@ -3563,7 +3583,24 @@ function handleCategoryBreakdownClick(event) {
 }
 
 function resetDemoData() {
-  loadSampleTrip({ dismissOnboarding: false, targetTab: "dashboard", confirmReplace: true });
+  const shouldReset = window.confirm("Reset will erase current trip data on this device. Continue?");
+  if (!shouldReset) return;
+  state = buildEmptyState();
+  familyPrefs = { adults: 2, children: 0, splitByRole: false };
+  saveFamilyPrefs();
+  uiState.itineraryFormPlacement = null;
+  uiState.costFormPlacement = null;
+  uiState.itineraryEditId = null;
+  uiState.costItemEditId = null;
+  uiState.dashboardDayModalOpen = false;
+  uiState.importReminderOpen = false;
+  uiState.setupWizardVisible = false;
+  uiState.setupWizardMinimized = false;
+  uiState.setupWizardStep = 1;
+  saveState();
+  switchTab("dashboard");
+  render();
+  showToast("Trip reset.");
 }
 
 function dismissOnboardingPanelOnly() {
@@ -3740,7 +3777,7 @@ function syncBodyScrollLock() {
 }
 
 function showImportReminderOnLoad() {
-  openImportReminder();
+  // Initial welcome popup disabled. Trip opens directly to the app.
 }
 
 function handleImportReminderModalClick(event) {
@@ -3952,4 +3989,3 @@ el.tabButtons.forEach((button) => {
 
 uiState.appReady = true;
 render();
-showImportReminderOnLoad();

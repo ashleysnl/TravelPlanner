@@ -85,19 +85,6 @@
           <p id="dashboardTripMeta" class="muted"></p>
         </div>
 
-        <section id="onboardingPanel" class="onboarding-panel no-print" hidden aria-labelledby="onboardingTitle">
-          <div>
-            <h3 id="onboardingTitle">Get started fast</h3>
-            <p class="muted">New here? Load a sample Disney-style family trip (demo) to preview itinerary + budget tracking, or start with a blank planner.</p>
-          </div>
-          <div class="onboarding-actions">
-            <button id="loadSampleTripBtn" type="button" class="btn btn-primary">Load sample Disney-style family trip (demo)</button>
-            <button id="startEmptyTripBtn" type="button" class="btn btn-secondary control-btn">Start empty</button>
-            <button id="onboardingImportBackupBtn" type="button" class="btn btn-primary">Import backup</button>
-            <button id="dismissOnboardingBtn" type="button" class="icon-btn">Dismiss</button>
-          </div>
-        </section>
-
         <div class="metric-grid" id="metricGrid"></div>
 
         <div class="breakdown-wrap">
@@ -195,7 +182,7 @@
             </select>
           </label>
           <label>
-            Forecast
+            Forecasted Cost
             <input type="number" id="activityPlannedUsd" min="0" step="0.01" required />
           </label>
           <label class="form-advanced-field">

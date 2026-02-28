@@ -2933,7 +2933,54 @@ td {
   }
 
   .setup-wizard-steps {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .setup-wizard-steps::-webkit-scrollbar {
+    display: none;
+  }
+
+  .setup-step-chip {
+    flex: 0 0 auto;
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    padding: 0;
+    border-radius: 999px;
     grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 0;
+  }
+
+  .setup-step-chip .dot {
+    width: 18px;
+    height: 18px;
+    font-size: 0.66rem;
+  }
+
+  .setup-step-chip .label {
+    display: none;
+  }
+
+  .setup-step-chip.is-active {
+    width: auto;
+    min-width: 152px;
+    height: 34px;
+    border-radius: 999px;
+    padding: 4px 10px;
+    grid-template-columns: auto 1fr;
+    gap: 6px;
+    justify-items: initial;
+  }
+
+  .setup-step-chip.is-active .label {
+    display: block;
   }
 
   .setup-wizard-fields {

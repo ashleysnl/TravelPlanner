@@ -14,18 +14,9 @@
         <p class="eyebrow">TravelPlanner • Family budget • Local-first</p>
         <h1 id="heroTripTitle">Plan your family vacation without spreadsheets.</h1>
         <p class="hero-subtitle">Offline • No login • Your data stays on your device</p>
-        <p class="hero-proof">Private, local-first trip planning. No cloud. No tracking.</p>
         <div class="hero-cta-row no-print">
           <button id="startPlanningBtn" class="btn btn-primary" type="button">Start Planning</button>
-          <button id="heroLoadDemoBtn" class="btn btn-secondary control-btn" type="button">Load Demo Trip</button>
-          <button id="openTripBtn" class="btn btn-secondary control-btn" type="button">Open Trip</button>
-          <a
-            class="btn btn-secondary control-btn support-link-btn"
-            href="https://buymeacoffee.com/ashleysnl"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="If this saved you from a spreadsheet"
-          >☕ Support</a>
+          <button id="heroLoadDemoBtn" class="btn btn-secondary control-btn" type="button">Load Demo</button>
         </div>
         <div class="hero-perfect-for" aria-label="Perfect for">
           <span class="hero-perfect-label">Perfect for:</span>
@@ -38,9 +29,7 @@
         </div>
       </div>
       <div class="hero-actions no-print">
-        <button id="printReportBtn" class="btn btn-primary">Print PDF</button>
-        <button id="resetDemoBtn" class="btn btn-secondary">Reset</button>
-        <button id="aboutAppBtn" type="button" class="btn btn-secondary control-btn">About</button>
+        <button id="appMenuBtn" class="btn btn-secondary control-btn" type="button" aria-haspopup="true" aria-expanded="false">Menu</button>
       </div>
     </header>
 
@@ -50,28 +39,25 @@
       <div class="trip-snapshot-head">
         <div>
           <h2 id="tripSnapshotTitle">Trip Snapshot</h2>
-          <p class="muted small-copy">Quick totals for your trip budget and plan progress.</p>
+          <p class="muted small-copy">A quick view of where your plan stands right now.</p>
         </div>
         <div class="offline-badge-wrap" aria-label="Offline storage status">
           <span class="offline-badge">Works offline (even on flights)</span>
-          <span class="offline-badge-note">Your data is stored locally in your browser.</span>
-          <span class="offline-badge-trust">No data leaves your device.</span>
+          <span class="offline-badge-note">No data leaves your device.</span>
         </div>
       </div>
       <div class="trip-snapshot-auto-note">
-        <span class="trip-snapshot-info" aria-hidden="true" title="Snapshot updates automatically. Data stays on this device.">i</span>
-        <span class="muted small-copy">Snapshot updates automatically. Data stays on this device.</span>
+        <span class="trip-snapshot-info" aria-hidden="true">i</span>
+        <span class="muted small-copy">Updates automatically as you plan.</span>
       </div>
       <div id="tripSnapshotGrid" class="trip-snapshot-grid" aria-live="polite"></div>
     </section>
 
     <main class="tabbed-layout">
       <nav class="tabs no-print" aria-label="App Sections">
-        <button type="button" class="tab-btn active" data-tab-target="dashboard">Dashboard</button>
-        <button type="button" class="tab-btn" data-tab-target="itinerary">Itinerary</button>
-        <button type="button" class="tab-btn" data-tab-target="costs">Costs</button>
-        <button type="button" class="tab-btn" data-tab-target="settings">Settings</button>
-        <button type="button" class="tab-btn" data-tab-target="report">Report</button>
+        <button type="button" class="tab-btn active" data-mode-target="plan">Plan</button>
+        <button type="button" class="tab-btn" data-mode-target="budget">Budget</button>
+        <button type="button" class="tab-btn" data-mode-target="summary">Summary</button>
       </nav>
 
       <section class="panel dashboard-panel tab-panel active" data-tab-panel="dashboard" aria-labelledby="dashboard-heading">
@@ -95,6 +81,7 @@
           <div class="subsection dashboard-budget-panel">
             <h3>Budget Health</h3>
             <div class="progress-card">
+              <p id="budgetHealthState" class="budget-health-state"></p>
               <div class="progress-row">
                 <span>Forecast vs Budget</span>
                 <span id="plannedBudgetPct">0%</span>
@@ -127,6 +114,8 @@
           <h2 id="timeline-heading">Itinerary Builder</h2>
           <p>Build your trip itinerary with scheduled activities and costs</p>
         </div>
+
+        <section id="planChecklist" class="plan-checklist no-print"></section>
 
         <div id="itineraryComposer" class="itinerary-composer no-print"></div>
 
@@ -469,6 +458,7 @@
         <span class="muted">Private, local-first trip planning. No login. No tracking.</span>
       </div>
       <div class="app-footer-actions">
+        <button id="footerMenuBtn" type="button" class="icon-btn" aria-label="Open menu">Menu</button>
         <a
           class="footer-support-link"
           href="https://buymeacoffee.com/ashleysnl"
@@ -481,19 +471,23 @@
     </footer>
   </div>
 
-  <div class="global-fab-row no-print" aria-label="Quick actions">
-    <a
-      id="globalSupportBtn"
-      class="global-support-btn"
-      href="https://buymeacoffee.com/ashleysnl"
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label="Buy me a coffee"
-      title="Buy me a coffee"
-    >☕ Support</a>
-    <button id="globalSaveBtn" class="global-save-btn" type="button" aria-label="Export JSON Backup" title="Export JSON Backup">
-      Save
-    </button>
+  <div id="appMenu" class="app-menu no-print" hidden>
+    <div class="app-menu-backdrop" data-menu-close="1"></div>
+    <div class="app-menu-card" role="dialog" aria-modal="true" aria-labelledby="appMenuTitle">
+      <div class="app-menu-head">
+        <h4 id="appMenuTitle">Menu</h4>
+        <button id="appMenuCloseBtn" type="button" class="icon-btn" aria-label="Close menu">Close</button>
+      </div>
+      <div class="app-menu-actions">
+        <button id="menuOpenTripBtn" type="button" class="btn btn-secondary control-btn">Open Trip</button>
+        <button id="menuSaveTripBtn" type="button" class="btn btn-secondary control-btn">Save Trip</button>
+        <button id="menuPrintBtn" type="button" class="btn btn-secondary control-btn">Print PDF</button>
+        <button id="menuResetBtn" type="button" class="btn btn-secondary control-btn">Reset</button>
+        <button id="menuAboutBtn" type="button" class="btn btn-secondary control-btn">About</button>
+        <a class="btn btn-secondary control-btn" href="https://buymeacoffee.com/ashleysnl" target="_blank" rel="noopener noreferrer">☕ Support</a>
+      </div>
+      <p class="muted small-copy">Changes are saved on this device automatically.</p>
+    </div>
   </div>
 
   <div id="importReminderModal" class="dashboard-day-detail no-print" hidden>

@@ -11,6 +11,7 @@ const ONBOARDING_DISMISSED_KEY = "travelplanner_onboarding_dismissed";
 const ITIN_FORM_MODE_KEY = "travelplanner_itin_form_mode";
 const COST_FORM_MODE_KEY = "travelplanner_cost_form_mode";
 const BLANK_DEFAULT_MIGRATION_KEY = "travelplanner_blank_default_migration_v1";
+const ACTIVE_MODE_KEY = "travelplanner_active_mode";
 const memoryStorageFallback = new Map();
 
 function storageGet(key) {
@@ -282,6 +283,7 @@ const uiState = {
   setupWizardVisible: false,
   setupWizardMinimized: false,
   setupWizardStep: 1,
+  appMenuOpen: false,
   appReady: false,
   dashboardQuickEdit: null,
   dashboardQuickPlacement: null,
@@ -341,17 +343,21 @@ const el = {
   costItemFormTitle: document.getElementById("costItemFormTitle"),
   costItemFormCancelEdit: document.getElementById("costItemFormCancelEdit"),
   costItemFormSubmit: document.getElementById("costItemFormSubmit"),
-  printReportBtn: document.getElementById("printReportBtn"),
-  resetDemoBtn: document.getElementById("resetDemoBtn"),
-  aboutAppBtn: document.getElementById("aboutAppBtn"),
+  printReportBtn: document.getElementById("menuPrintBtn"),
+  resetDemoBtn: document.getElementById("menuResetBtn"),
+  aboutAppBtn: document.getElementById("menuAboutBtn"),
   footerAboutBtn: document.getElementById("footerAboutBtn"),
   exportJsonBtn: document.getElementById("exportJsonBtn"),
   importJsonBtn: document.getElementById("importJsonBtn"),
   importJsonFile: document.getElementById("importJsonFile"),
-  globalSaveBtn: document.getElementById("globalSaveBtn"),
+  globalSaveBtn: document.getElementById("menuSaveTripBtn"),
   startPlanningBtn: document.getElementById("startPlanningBtn"),
   heroLoadDemoBtn: document.getElementById("heroLoadDemoBtn"),
-  openTripBtn: document.getElementById("openTripBtn"),
+  openTripBtn: document.getElementById("menuOpenTripBtn"),
+  appMenu: document.getElementById("appMenu"),
+  appMenuBtn: document.getElementById("appMenuBtn"),
+  appMenuCloseBtn: document.getElementById("appMenuCloseBtn"),
+  footerMenuBtn: document.getElementById("footerMenuBtn"),
   importReminderModal: document.getElementById("importReminderModal"),
   importReminderImportBtn: document.getElementById("importReminderImportBtn"),
   importReminderDismissBtn: document.getElementById("importReminderDismissBtn"),
@@ -361,8 +367,9 @@ const el = {
   supportBanner: document.getElementById("supportBanner"),
   supportBannerDismissBtn: document.getElementById("supportBannerDismissBtn"),
   supportBannerCoffeeLink: document.getElementById("supportBannerCoffeeLink"),
-  tabButtons: Array.from(document.querySelectorAll(".tab-btn")),
+  tabButtons: Array.from(document.querySelectorAll(".tab-btn[data-mode-target]")),
   tabPanels: Array.from(document.querySelectorAll(".tab-panel")),
+  tripSnapshotSection: document.querySelector(".trip-snapshot"),
   metricGrid: document.getElementById("metricGrid"),
   onboardingPanel: document.getElementById("onboardingPanel"),
   loadSampleTripBtn: document.getElementById("loadSampleTripBtn"),
@@ -394,6 +401,7 @@ const el = {
   dashboardTimelineRange: document.getElementById("dashboardTimelineRange"),
   appToast: document.getElementById("appToast"),
   itineraryComposer: document.getElementById("itineraryComposer"),
+  planChecklist: document.getElementById("planChecklist"),
   itineraryList: document.getElementById("itineraryList"),
   costsComposer: document.getElementById("costsComposer"),
   costsList: document.getElementById("costsList"),
@@ -401,8 +409,10 @@ const el = {
   costItemsTableBody: document.querySelector("#costItemsTable tbody"),
   plannedBudgetPct: document.getElementById("plannedBudgetPct"),
   paidBudgetPct: document.getElementById("paidBudgetPct"),
+  budgetHealthState: document.getElementById("budgetHealthState"),
   plannedBudgetBar: document.getElementById("plannedBudgetBar"),
   paidBudgetBar: document.getElementById("paidBudgetBar"),
+  budgetProgressCard: document.querySelector(".dashboard-budget-panel .progress-card"),
   reportTripName: document.getElementById("reportTripName"),
   reportTripMeta: document.getElementById("reportTripMeta"),
   reportRate: document.getElementById("reportRate"),
@@ -544,7 +554,7 @@ function openSetupWizard({ step = 1, scroll = true } = {}) {
   uiState.setupWizardVisible = true;
   uiState.setupWizardMinimized = false;
   uiState.setupWizardStep = Math.min(5, Math.max(1, Number(step) || 1));
-  switchTab("dashboard");
+  switchTab("plan");
   render();
   if (scroll && el.setupWizardCard) {
     requestAnimationFrame(() => el.setupWizardCard.scrollIntoView({ behavior: "smooth", block: "start" }));
@@ -894,7 +904,7 @@ function handleSetupWizardClick(event) {
   }
   if (action === "wizardFinish") {
     minimizeSetupWizard();
-    switchTab("dashboard");
+    switchTab("plan");
     render();
   }
 }
@@ -1280,9 +1290,15 @@ function markSupportBannerDismissed() {
   }
 }
 
-function maybeQueueSupportBannerAfterMeaningfulAction() {
+function maybeQueueSupportBannerAfterMeaningfulAction(trigger = "save") {
   if (!uiState.appReady) return;
   if (isSupportBannerDismissed() || hasSupportBannerShown()) return;
+  const activityCount = (state.activities || []).length;
+  const costCount = (state.costItems || []).length;
+  const paidCount = [...(state.activities || []), ...(state.costItems || [])].filter((item) => (Number(item.paidUsd) || 0) > 0).length;
+  const reachedValueMoment =
+    trigger === "export" || trigger === "print" || activityCount >= 5 || costCount >= 5 || paidCount >= 3;
+  if (!reachedValueMoment) return;
   uiState.supportBannerQueued = true;
   renderSupportUi();
 }
@@ -1316,6 +1332,7 @@ function dismissSupportBanner({ permanent = true } = {}) {
 }
 
 function getActiveModalElement() {
+  if (uiState.appMenuOpen && el.appMenu && !el.appMenu.hidden) return el.appMenu;
   if (uiState.importReminderOpen && el.importReminderModal && !el.importReminderModal.hidden) return el.importReminderModal;
   if (uiState.aboutModalOpen && el.aboutModal && !el.aboutModal.hidden) return el.aboutModal;
   if (uiState.dashboardDayModalOpen && el.dashboardDayDetail && !el.dashboardDayDetail.hidden) return el.dashboardDayDetail;
@@ -2680,7 +2697,7 @@ function renderTripSnapshot(summary) {
       sub: hasAnyCosts ? "Paid total (all items)" : "Add costs to calculate",
     },
     {
-      label: "Cost / Person",
+      label: "Per Person Estimate",
       currency: currencyLabel,
       value: hasCostPerPerson ? numberDisplayRoundedFromCad(summary.familySummary.perPersonPlannedCad) : "—",
       sub: travelerCount <= 0 ? "Set travelers" : hasAnyCosts ? "Uses adults + kids" : "Add costs to calculate",
@@ -2709,6 +2726,43 @@ function renderTripSnapshot(summary) {
       `
     )
     .join("");
+}
+
+function renderPlanChecklist(summary) {
+  if (!el.planChecklist) return;
+  const checks = [
+    { label: "Set dates", done: Boolean(state.settings.startDate && state.settings.endDate) },
+    { label: "Add budget", done: (Number(state.settings.totalBudgetCad) || 0) > 0 },
+    { label: "Add 1 activity", done: (summary.activities || []).length > 0 },
+    { label: "Add 1 cost", done: (summary.costItems || []).length > 0 },
+  ];
+  const allDone = checks.every((c) => c.done);
+  if (allDone) {
+    el.planChecklist.innerHTML = "";
+    el.planChecklist.hidden = true;
+    return;
+  }
+  el.planChecklist.hidden = false;
+  el.planChecklist.innerHTML = `
+    <div class="plan-checklist-card">
+      <div class="plan-checklist-head">
+        <strong>Quick setup checklist</strong>
+        <span>${checks.filter((c) => c.done).length}/${checks.length}</span>
+      </div>
+      <div class="plan-checklist-items">
+        ${checks
+          .map(
+            (check) => `
+              <div class="plan-checklist-item ${check.done ? "is-done" : ""}">
+                <span class="dot">${check.done ? "✓" : "•"}</span>
+                <span>${check.label}</span>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
 }
 
 function hasMeaningfulTripData() {
@@ -2925,10 +2979,33 @@ function renderDashboard(summary) {
 
   const plannedPct = summary.budgetCad > 0 ? (summary.plannedCad / summary.budgetCad) * 100 : 0;
   const paidPct = summary.budgetCad > 0 ? (summary.paidCad / summary.budgetCad) * 100 : 0;
-  el.plannedBudgetPct.textContent = `${plannedPct.toFixed(1)}%`;
-  el.paidBudgetPct.textContent = `${paidPct.toFixed(1)}%`;
-  el.plannedBudgetBar.style.width = `${clampPct(plannedPct)}%`;
-  el.paidBudgetBar.style.width = `${clampPct(paidPct)}%`;
+  const hasBudgetInsights = summary.plannedCad > 0 || summary.paidCad > 0;
+  if (el.budgetProgressCard) {
+    el.budgetProgressCard.dataset.empty = hasBudgetInsights ? "0" : "1";
+  }
+  if (!hasBudgetInsights) {
+    el.plannedBudgetPct.textContent = "—";
+    el.paidBudgetPct.textContent = "—";
+    el.plannedBudgetBar.style.width = "0%";
+    el.paidBudgetBar.style.width = "0%";
+    if (el.budgetHealthState) {
+      el.budgetHealthState.className = "budget-health-state is-empty";
+      el.budgetHealthState.textContent = "Add your first cost to see budget insights.";
+    }
+  } else {
+    const forecastRatio = clampPct(plannedPct);
+    const healthTone = forecastRatio > 100 ? "is-over" : forecastRatio >= 85 ? "is-close" : "is-good";
+    const healthLabel =
+      forecastRatio > 100 ? "You're over budget" : forecastRatio >= 85 ? "You're close to your limit" : "You're within budget";
+    el.plannedBudgetPct.textContent = `${plannedPct.toFixed(1)}%`;
+    el.paidBudgetPct.textContent = `${paidPct.toFixed(1)}%`;
+    el.plannedBudgetBar.style.width = `${forecastRatio}%`;
+    el.paidBudgetBar.style.width = `${clampPct(paidPct)}%`;
+    if (el.budgetHealthState) {
+      el.budgetHealthState.className = `budget-health-state ${healthTone}`;
+      el.budgetHealthState.textContent = `${healthLabel} (${plannedPct.toFixed(1)}% forecast)`;
+    }
+  }
 
   renderCompactDashboardTimeline(summary);
 }
@@ -3005,7 +3082,7 @@ function renderReport(summary) {
     [`Budget (${displayCurrencyLabel()})`, moneyDisplayFromCad(summary.budgetCad)],
     [`Total Planned (${displayCurrencyLabel()})`, moneyDisplayFromCad(summary.plannedCad)],
     [`Total Paid (${displayCurrencyLabel()})`, moneyDisplayFromCad(summary.paidCad)],
-    [`Cost / Person (${displayCurrencyLabel()})`, travelerCountForCost ? moneyDisplayFromCad(summary.familySummary.perPersonPlannedCad) : "—"],
+    [`Per Person Estimate (${displayCurrencyLabel()})`, travelerCountForCost ? moneyDisplayFromCad(summary.familySummary.perPersonPlannedCad) : "—"],
     ["Trip Days", summary.tripDays ? `${summary.tripDays}` : "—"],
     ["Activities", String((summary.activities || []).length || 0)],
   ];
@@ -3292,6 +3369,7 @@ function render() {
   syncFormModes();
   const summary = calculateSummary();
   renderTripSnapshot(summary);
+  renderPlanChecklist(summary);
   renderSetupWizard(summary);
   renderDashboard(summary);
   renderItineraryList(summary);
@@ -3583,6 +3661,7 @@ function handleCategoryBreakdownClick(event) {
 }
 
 function resetDemoData() {
+  closeAppMenu();
   const shouldReset = window.confirm("Reset will erase current trip data on this device. Continue?");
   if (!shouldReset) return;
   state = buildEmptyState();
@@ -3598,7 +3677,7 @@ function resetDemoData() {
   uiState.setupWizardMinimized = false;
   uiState.setupWizardStep = 1;
   saveState();
-  switchTab("dashboard");
+  switchTab("plan");
   render();
   showToast("Trip reset.");
 }
@@ -3647,6 +3726,7 @@ function recordBackupExport(fileName, nowIso = new Date().toISOString()) {
   meta.lastDataChangeAt = nowIso;
   saveState(false);
   renderBackupUi();
+  maybeQueueSupportBannerAfterMeaningfulAction("export");
 }
 
 async function handleGlobalSaveClick() {
@@ -3689,24 +3769,51 @@ function openImportPicker({ confirmReplace = false } = {}) {
   el.importJsonFile.click();
 }
 
+function resolveMode(tabOrMode) {
+  const raw = String(tabOrMode || "").toLowerCase();
+  if (raw === "plan" || raw === "budget" || raw === "summary") return raw;
+  if (raw === "itinerary" || raw === "settings") return "plan";
+  if (raw === "costs" || raw === "dashboard") return "budget";
+  if (raw === "report") return "summary";
+  return "plan";
+}
+
+function getModePanels(mode) {
+  return (
+    {
+      plan: ["itinerary", "settings"],
+      budget: ["costs", "dashboard"],
+      summary: ["report"],
+    }[mode] || ["itinerary", "settings"]
+  );
+}
+
 function switchTab(tabName) {
-  if (tabName === "itinerary") {
+  const mode = resolveMode(tabName);
+  if (mode !== "plan") {
     hideItineraryInlineForm();
     resetActivityForm();
   }
-  if (tabName === "costs") {
+  if (mode !== "budget") {
     hideCostInlineForm();
     resetCostItemForm();
   }
+  const visiblePanels = new Set(getModePanels(mode));
+
+  storageSet(ACTIVE_MODE_KEY, mode);
   el.tabButtons.forEach((button) => {
-    const isActive = button.dataset.tabTarget === tabName;
+    const isActive = button.dataset.modeTarget === mode;
     button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
   el.tabPanels.forEach((panel) => {
-    const isActive = panel.dataset.tabPanel === tabName;
+    const isActive = visiblePanels.has(panel.dataset.tabPanel);
     panel.hidden = !isActive;
     panel.classList.toggle("active", isActive);
   });
+  if (el.tripSnapshotSection) {
+    el.tripSnapshotSection.hidden = mode !== "summary";
+  }
 }
 
 function handleDashboardTimelineClick(event) {
@@ -3754,8 +3861,36 @@ function closeImportReminder() {
   renderSupportUi();
 }
 
+function syncAppMenu() {
+  if (!el.appMenu) return;
+  el.appMenu.hidden = !uiState.appMenuOpen;
+  if (el.appMenuBtn) {
+    el.appMenuBtn.setAttribute("aria-expanded", uiState.appMenuOpen ? "true" : "false");
+  }
+  syncBodyScrollLock();
+}
+
+function openAppMenu() {
+  uiState.appMenuOpen = true;
+  syncAppMenu();
+  requestAnimationFrame(() => focusModalPrimaryAction(el.appMenu));
+}
+
+function closeAppMenu() {
+  uiState.appMenuOpen = false;
+  syncAppMenu();
+}
+
+function handleAppMenuClick(event) {
+  if (event.target === el.appMenu || event.target.dataset.menuClose === "1") {
+    closeAppMenu();
+  }
+}
+
 function syncBodyScrollLock() {
-  const hasOpenModal = Boolean(uiState.dashboardDayModalOpen || uiState.importReminderOpen || uiState.aboutModalOpen);
+  const hasOpenModal = Boolean(
+    uiState.dashboardDayModalOpen || uiState.importReminderOpen || uiState.aboutModalOpen || uiState.appMenuOpen
+  );
   const body = document.body;
   if (!body) return;
 
@@ -3840,6 +3975,10 @@ function handleDashboardDayModalClick(event) {
 function handleGlobalKeydown(event) {
   if (trapFocusInModal(event)) return;
   if (event.key !== "Escape") return;
+  if (uiState.appMenuOpen) {
+    closeAppMenu();
+    return;
+  }
   if (uiState.importReminderOpen) {
     closeImportReminder();
     return;
@@ -3945,24 +4084,45 @@ el.categoryBreakdown?.addEventListener("click", handleCategoryBreakdownClick);
 el.dashboardItinerary.addEventListener("click", handleDashboardTimelineClick);
 el.dashboardItinerary.addEventListener("keydown", handleDashboardTimelineKeydown);
 el.dashboardDayDetail.addEventListener("click", handleDashboardDayModalClick);
-el.printReportBtn.addEventListener("click", () => window.print());
-el.resetDemoBtn.addEventListener("click", resetDemoData);
+el.printReportBtn?.addEventListener("click", () => {
+  closeAppMenu();
+  switchTab("summary");
+  window.print();
+  maybeQueueSupportBannerAfterMeaningfulAction("export");
+});
+el.resetDemoBtn?.addEventListener("click", resetDemoData);
 el.startPlanningBtn?.addEventListener("click", startPlanningFromHero);
 el.heroLoadDemoBtn?.addEventListener("click", () =>
   loadSampleTrip({ dismissOnboarding: true, targetTab: "dashboard", confirmReplace: true })
 );
-el.openTripBtn?.addEventListener("click", () => openImportPicker({ confirmReplace: true }));
+el.openTripBtn?.addEventListener("click", () => {
+  closeAppMenu();
+  openImportPicker({ confirmReplace: true });
+});
 el.loadSampleTripBtn?.addEventListener("click", loadSampleTripFromOnboarding);
 el.startEmptyTripBtn?.addEventListener("click", startEmptyTripFromOnboarding);
 el.onboardingImportBackupBtn?.addEventListener("click", () => openImportPicker({ confirmReplace: false }));
 el.dismissOnboardingBtn?.addEventListener("click", dismissOnboardingPanelOnly);
 el.setupWizardCard?.addEventListener("click", handleSetupWizardClick);
-el.aboutAppBtn?.addEventListener("click", openAboutModal);
+el.aboutAppBtn?.addEventListener("click", () => {
+  closeAppMenu();
+  openAboutModal();
+});
 el.footerAboutBtn?.addEventListener("click", openAboutModal);
 el.exportJsonBtn.addEventListener("click", exportJsonBackup);
 el.importJsonBtn.addEventListener("click", () => openImportPicker({ confirmReplace: false }));
 el.importJsonFile.addEventListener("change", importJsonBackup);
-el.globalSaveBtn?.addEventListener("click", handleGlobalSaveClick);
+el.globalSaveBtn?.addEventListener("click", () => {
+  closeAppMenu();
+  handleGlobalSaveClick();
+});
+el.appMenuBtn?.addEventListener("click", () => {
+  if (uiState.appMenuOpen) closeAppMenu();
+  else openAppMenu();
+});
+el.footerMenuBtn?.addEventListener("click", openAppMenu);
+el.appMenuCloseBtn?.addEventListener("click", closeAppMenu);
+el.appMenu?.addEventListener("click", handleAppMenuClick);
 el.importReminderModal?.addEventListener("click", handleImportReminderModalClick);
 el.importReminderImportBtn?.addEventListener("click", () => {
   closeImportReminder();
@@ -3984,8 +4144,9 @@ el.activityFormModeButtons.advanced?.addEventListener("click", () => setItinerar
 el.costItemFormModeButtons.basic?.addEventListener("click", () => setCostFormUiMode("basic"));
 el.costItemFormModeButtons.advanced?.addEventListener("click", () => setCostFormUiMode("advanced"));
 el.tabButtons.forEach((button) => {
-  button.addEventListener("click", () => switchTab(button.dataset.tabTarget));
+  button.addEventListener("click", () => switchTab(button.dataset.modeTarget));
 });
 
 uiState.appReady = true;
 render();
+switchTab(storageGet(ACTIVE_MODE_KEY) || "plan");

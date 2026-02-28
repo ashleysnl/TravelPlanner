@@ -347,7 +347,7 @@ body {
 
 .tabs {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   margin-bottom: 14px;
 }
@@ -360,12 +360,151 @@ body {
   padding: 10px 14px;
   font-weight: 700;
   cursor: pointer;
+  flex: 1 1 0;
+  text-align: center;
 }
 
 .tab-btn.active {
   background: linear-gradient(135deg, #0f6abf, #0ea5a8);
   color: #fff;
   border-color: transparent;
+}
+
+.plan-checklist {
+  margin-bottom: 12px;
+}
+
+.plan-checklist[hidden] {
+  display: none !important;
+}
+
+.plan-checklist-card {
+  border: 1px solid #dbe7f7;
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px;
+}
+
+.plan-checklist-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.plan-checklist-items {
+  display: grid;
+  gap: 6px;
+}
+
+.plan-checklist-item {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  color: #5c708a;
+  font-size: 0.82rem;
+}
+
+.plan-checklist-item .dot {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid #d6e3f8;
+  background: #f8fbff;
+  font-weight: 700;
+  color: #6883a1;
+  flex-shrink: 0;
+}
+
+.plan-checklist-item.is-done {
+  color: #39658f;
+}
+
+.plan-checklist-item.is-done .dot {
+  border-color: #b7d8f9;
+  background: #eaf4ff;
+  color: #0f6abf;
+}
+
+.budget-health-state {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #3a5f87;
+}
+
+.budget-health-state.is-good {
+  color: #166a54;
+}
+
+.budget-health-state.is-close {
+  color: #9a6500;
+}
+
+.budget-health-state.is-over {
+  color: #b13f4a;
+}
+
+.budget-health-state.is-empty {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.progress-card[data-empty="1"] .progress-row,
+.progress-card[data-empty="1"] .progress-track {
+  display: none;
+}
+
+.app-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 1150;
+  display: grid;
+  place-items: center;
+  padding: 14px;
+}
+
+.app-menu[hidden] {
+  display: none !important;
+}
+
+.app-menu-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.app-menu-card {
+  position: relative;
+  z-index: 1;
+  width: min(460px, 94vw);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.18);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.app-menu-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.app-menu-head h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.app-menu-actions {
+  display: grid;
+  gap: 8px;
 }
 
 .panel {
@@ -3080,21 +3219,44 @@ td {
 }
 
 @media (max-width: 680px) {
+  body {
+    padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .tabs {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    z-index: 1040;
+    margin: 0;
+    padding: 6px;
+    border: 1px solid #dbe7f7;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.12);
+    backdrop-filter: blur(8px);
+  }
+
+  .tab-btn {
+    padding: 9px 8px;
+    font-size: 0.82rem;
+  }
+
   .hero {
     flex-direction: column;
   }
 
   .hero-actions {
     width: 100%;
-    justify-content: flex-start;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-content: flex-end;
+    display: flex;
     gap: 8px;
   }
 
   .hero-actions .btn {
-    width: 100%;
-    min-width: 0;
+    width: auto;
+    min-width: 100px;
     padding: 8px 10px;
     font-size: 0.84rem;
   }

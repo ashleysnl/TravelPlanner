@@ -350,7 +350,8 @@ const el = {
   exportJsonBtn: document.getElementById("exportJsonBtn"),
   importJsonBtn: document.getElementById("importJsonBtn"),
   importJsonFile: document.getElementById("importJsonFile"),
-  globalSaveBtn: document.getElementById("menuSaveTripBtn"),
+  globalSaveBtn: document.getElementById("globalSaveBtn"),
+  menuSaveTripBtn: document.getElementById("menuSaveTripBtn"),
   startPlanningBtn: document.getElementById("startPlanningBtn"),
   heroLoadDemoBtn: document.getElementById("heroLoadDemoBtn"),
   openTripBtn: document.getElementById("menuOpenTripBtn"),
@@ -3915,6 +3916,13 @@ function showImportReminderOnLoad() {
   // Initial welcome popup disabled. Trip opens directly to the app.
 }
 
+function enforceBlankLaunchState() {
+  state = buildEmptyState();
+  uiState.setupWizardVisible = false;
+  uiState.setupWizardMinimized = false;
+  uiState.setupWizardStep = 1;
+}
+
 function handleImportReminderModalClick(event) {
   if (event.target === el.importReminderModal || event.target.dataset.modalClose === "import-reminder") {
     closeImportReminder();
@@ -4112,7 +4120,8 @@ el.footerAboutBtn?.addEventListener("click", openAboutModal);
 el.exportJsonBtn.addEventListener("click", exportJsonBackup);
 el.importJsonBtn.addEventListener("click", () => openImportPicker({ confirmReplace: false }));
 el.importJsonFile.addEventListener("change", importJsonBackup);
-el.globalSaveBtn?.addEventListener("click", () => {
+el.globalSaveBtn?.addEventListener("click", handleGlobalSaveClick);
+el.menuSaveTripBtn?.addEventListener("click", () => {
   closeAppMenu();
   handleGlobalSaveClick();
 });
@@ -4148,5 +4157,6 @@ el.tabButtons.forEach((button) => {
 });
 
 uiState.appReady = true;
+enforceBlankLaunchState();
 render();
 switchTab(storageGet(ACTIVE_MODE_KEY) || "plan");

@@ -583,6 +583,7 @@ function syncPlanningLockUi() {
   const body = document.body;
   if (!body) return;
   body.classList.toggle("planning-locked", isPlanningLocked());
+  body.classList.toggle("setup-focus", uiState.setupWizardVisible && !uiState.setupWizardMinimized);
 }
 
 function enforcePlanningGatePanels() {

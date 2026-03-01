@@ -520,6 +520,20 @@ body.planning-locked .control-panel {
   display: none !important;
 }
 
+body.planning-locked .trip-snapshot,
+body.planning-locked .tabbed-layout {
+  display: none !important;
+}
+
+body.setup-focus .trip-snapshot,
+body.setup-focus .tabbed-layout {
+  display: none !important;
+}
+
+body.setup-focus .setup-wizard-card {
+  display: block !important;
+}
+
 .tab-panel[hidden] {
   display: none !important;
 }

@@ -579,6 +579,12 @@ function isPlanningLocked() {
   return !uiState.planningUnlocked && !uiState.setupWizardVisible && !hasMeaningfulTripData();
 }
 
+function syncPlanningLockUi() {
+  const body = document.body;
+  if (!body) return;
+  body.classList.toggle("planning-locked", isPlanningLocked());
+}
+
 function enforcePlanningGatePanels() {
   if (!isPlanningLocked()) return;
   const planPanels = new Set(["itinerary", "settings"]);
@@ -588,10 +594,6 @@ function enforcePlanningGatePanels() {
       panel.classList.remove("active");
     }
   });
-  const activeMode = el.tabButtons.find((button) => button.classList.contains("active"))?.dataset.modeTarget;
-  if (activeMode === "plan") {
-    switchTab("summary");
-  }
 }
 
 function saveSetupWizardBasicsStep() {
@@ -3400,6 +3402,7 @@ function render() {
   renderActivitiesTable(summary);
   renderCostItemsTable(summary);
   renderReport(summary);
+  syncPlanningLockUi();
   enforcePlanningGatePanels();
   renderBackupUi();
   syncImportReminderModal();

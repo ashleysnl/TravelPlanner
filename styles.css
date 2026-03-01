@@ -515,6 +515,11 @@ body {
   box-shadow: var(--shadow);
 }
 
+body.planning-locked .activities-panel,
+body.planning-locked .control-panel {
+  display: none !important;
+}
+
 .tab-panel[hidden] {
   display: none !important;
 }

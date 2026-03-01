@@ -283,6 +283,7 @@ const uiState = {
   setupWizardVisible: false,
   setupWizardMinimized: false,
   setupWizardStep: 1,
+  planningUnlocked: false,
   appMenuOpen: false,
   appReady: false,
   dashboardQuickEdit: null,
@@ -552,6 +553,7 @@ function getSetupWizardStepStatuses(summary = calculateSummary()) {
 }
 
 function openSetupWizard({ step = 1, scroll = true } = {}) {
+  uiState.planningUnlocked = true;
   uiState.setupWizardVisible = true;
   uiState.setupWizardMinimized = false;
   uiState.setupWizardStep = Math.min(5, Math.max(1, Number(step) || 1));
@@ -571,6 +573,25 @@ function minimizeSetupWizard() {
 function closeSetupWizard() {
   uiState.setupWizardVisible = false;
   uiState.setupWizardMinimized = false;
+}
+
+function isPlanningLocked() {
+  return !uiState.planningUnlocked && !uiState.setupWizardVisible && !hasMeaningfulTripData();
+}
+
+function enforcePlanningGatePanels() {
+  if (!isPlanningLocked()) return;
+  const planPanels = new Set(["itinerary", "settings"]);
+  el.tabPanels.forEach((panel) => {
+    if (planPanels.has(panel.dataset.tabPanel)) {
+      panel.hidden = true;
+      panel.classList.remove("active");
+    }
+  });
+  const activeMode = el.tabButtons.find((button) => button.classList.contains("active"))?.dataset.modeTarget;
+  if (activeMode === "plan") {
+    switchTab("summary");
+  }
 }
 
 function saveSetupWizardBasicsStep() {
@@ -2795,6 +2816,7 @@ function confirmExampleReplaceIfNeeded() {
 function loadSampleTrip({ dismissOnboarding = false, targetTab = "dashboard", confirmReplace = true } = {}) {
   if (confirmReplace && !confirmExampleReplaceIfNeeded()) return false;
   state = normalizeImportedState(demoData);
+  uiState.planningUnlocked = true;
   familyPrefs = { adults: 2, children: 2, splitByRole: true };
   saveFamilyPrefs();
   if (dismissOnboarding) {
@@ -3378,6 +3400,7 @@ function render() {
   renderActivitiesTable(summary);
   renderCostItemsTable(summary);
   renderReport(summary);
+  enforcePlanningGatePanels();
   renderBackupUi();
   syncImportReminderModal();
   syncAboutModal();
@@ -3674,6 +3697,7 @@ function resetDemoData() {
   uiState.costItemEditId = null;
   uiState.dashboardDayModalOpen = false;
   uiState.importReminderOpen = false;
+  uiState.planningUnlocked = false;
   uiState.setupWizardVisible = false;
   uiState.setupWizardMinimized = false;
   uiState.setupWizardStep = 1;
@@ -3790,7 +3814,12 @@ function getModePanels(mode) {
 }
 
 function switchTab(tabName) {
-  const mode = resolveMode(tabName);
+  const requestedMode = resolveMode(tabName);
+  if (requestedMode === "plan" && isPlanningLocked()) {
+    openSetupWizard({ step: 1, scroll: true });
+    return;
+  }
+  const mode = requestedMode;
   if (mode !== "plan") {
     hideItineraryInlineForm();
     resetActivityForm();
@@ -3918,6 +3947,7 @@ function showImportReminderOnLoad() {
 
 function enforceBlankLaunchState() {
   state = buildEmptyState();
+  uiState.planningUnlocked = false;
   uiState.setupWizardVisible = false;
   uiState.setupWizardMinimized = false;
   uiState.setupWizardStep = 1;
@@ -4031,6 +4061,7 @@ async function importJsonBackup(event) {
       return;
     }
     state = normalizeImportedState(incoming);
+    uiState.planningUnlocked = true;
     const nowIso = new Date().toISOString();
     const meta = backupMeta();
     meta.lastImportAt = nowIso;
@@ -4153,10 +4184,16 @@ el.activityFormModeButtons.advanced?.addEventListener("click", () => setItinerar
 el.costItemFormModeButtons.basic?.addEventListener("click", () => setCostFormUiMode("basic"));
 el.costItemFormModeButtons.advanced?.addEventListener("click", () => setCostFormUiMode("advanced"));
 el.tabButtons.forEach((button) => {
-  button.addEventListener("click", () => switchTab(button.dataset.modeTarget));
+  button.addEventListener("click", () => {
+    if (button.dataset.modeTarget === "plan" && isPlanningLocked()) {
+      openSetupWizard({ step: 1, scroll: true });
+      return;
+    }
+    switchTab(button.dataset.modeTarget);
+  });
 });
 
 uiState.appReady = true;
 enforceBlankLaunchState();
 render();
-switchTab(storageGet(ACTIVE_MODE_KEY) || "plan");
+switchTab(isPlanningLocked() ? "summary" : storageGet(ACTIVE_MODE_KEY) || "plan");

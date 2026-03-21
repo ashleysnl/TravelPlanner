@@ -10,6 +10,28 @@ const FAMILY_SPLIT_TOGGLE_KEY = "travelplanner_family_split_toggle";
 const ONBOARDING_DISMISSED_KEY = "travelplanner_onboarding_dismissed";
 const ITIN_FORM_MODE_KEY = "travelplanner_itin_form_mode";
 const COST_FORM_MODE_KEY = "travelplanner_cost_form_mode";
+const BLANK_DEFAULT_MIGRATION_KEY = "travelplanner_blank_default_migration_v1";
+const ACTIVE_MODE_KEY = "travelplanner_active_mode";
+const memoryStorageFallback = new Map();
+
+function storageGet(key) {
+  try {
+    const value = localStorage.getItem(key);
+    return value == null ? memoryStorageFallback.get(key) ?? null : value;
+  } catch {
+    return memoryStorageFallback.get(key) ?? null;
+  }
+}
+
+function storageSet(key, value) {
+  const next = String(value);
+  memoryStorageFallback.set(key, next);
+  try {
+    localStorage.setItem(key, next);
+  } catch {
+    // Ignore storage write failures (e.g., private mode); app remains usable in-memory.
+  }
+}
 
 function makeId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -258,6 +280,11 @@ const uiState = {
   supportBannerVisible: false,
   toastTimer: null,
   onboardingVisible: false,
+  setupWizardVisible: false,
+  setupWizardMinimized: false,
+  setupWizardStep: 1,
+  planningUnlocked: false,
+  appMenuOpen: false,
   appReady: false,
   dashboardQuickEdit: null,
   dashboardQuickPlacement: null,
@@ -267,6 +294,45 @@ const uiState = {
   costItemEditId: null,
 };
 let bodyScrollLockY = 0;
+
+function isLegacySeededDemoState(candidate) {
+  const source = candidate || state;
+  if (!source?.settings) return false;
+  if (String(source.settings.tripName || "") !== String(demoData.settings.tripName || "")) return false;
+  if ((source.settings.startDate || "") !== (demoData.settings.startDate || "")) return false;
+  if ((source.settings.endDate || "") !== (demoData.settings.endDate || "")) return false;
+  if (Math.round(Number(source.settings.totalBudgetCad) || 0) !== Math.round(Number(demoData.settings.totalBudgetCad) || 0)) return false;
+
+  const sourceActivities = Array.isArray(source.activities) ? source.activities : [];
+  const sourceCosts = Array.isArray(source.costItems) ? source.costItems : [];
+  if (sourceActivities.length !== demoData.activities.length) return false;
+  if (sourceCosts.length !== demoData.costItems.length) return false;
+
+  const activitySignature = (item) => [item.date || "", item.time || "", item.title || "", item.location || "", item.category || ""].join("|");
+  const costSignature = (item) =>
+    [item.title || "", item.category || "", item.itineraryDate || "", item.itineraryTime || "", item.includeInItinerary ? "1" : "0"].join("|");
+
+  return (
+    sourceActivities.every((item, idx) => activitySignature(item) === activitySignature(demoData.activities[idx])) &&
+    sourceCosts.every((item, idx) => costSignature(item) === costSignature(demoData.costItems[idx]))
+  );
+}
+
+function migrateLegacySeededDemoToBlank() {
+  try {
+    if (storageGet(BLANK_DEFAULT_MIGRATION_KEY) === "1") return;
+    if (!isLegacySeededDemoState(state)) {
+      storageSet(BLANK_DEFAULT_MIGRATION_KEY, "1");
+      return;
+    }
+
+    state = buildEmptyState();
+    saveState(false);
+    storageSet(BLANK_DEFAULT_MIGRATION_KEY, "1");
+  } catch {
+    // Ignore migration failures and continue with current state.
+  }
+}
 
 const el = {
   settingsForm: document.getElementById("settingsForm"),
@@ -278,15 +344,22 @@ const el = {
   costItemFormTitle: document.getElementById("costItemFormTitle"),
   costItemFormCancelEdit: document.getElementById("costItemFormCancelEdit"),
   costItemFormSubmit: document.getElementById("costItemFormSubmit"),
-  printReportBtn: document.getElementById("printReportBtn"),
-  resetDemoBtn: document.getElementById("resetDemoBtn"),
-  aboutAppBtn: document.getElementById("aboutAppBtn"),
+  printReportBtn: document.getElementById("menuPrintBtn"),
+  resetDemoBtn: document.getElementById("menuResetBtn"),
+  aboutAppBtn: document.getElementById("menuAboutBtn"),
   footerAboutBtn: document.getElementById("footerAboutBtn"),
   exportJsonBtn: document.getElementById("exportJsonBtn"),
   importJsonBtn: document.getElementById("importJsonBtn"),
   importJsonFile: document.getElementById("importJsonFile"),
   globalSaveBtn: document.getElementById("globalSaveBtn"),
+  menuSaveTripBtn: document.getElementById("menuSaveTripBtn"),
   startPlanningBtn: document.getElementById("startPlanningBtn"),
+  heroLoadDemoBtn: document.getElementById("heroLoadDemoBtn"),
+  openTripBtn: document.getElementById("menuOpenTripBtn"),
+  appMenu: document.getElementById("appMenu"),
+  appMenuBtn: document.getElementById("appMenuBtn"),
+  appMenuCloseBtn: document.getElementById("appMenuCloseBtn"),
+  footerMenuBtn: document.getElementById("footerMenuBtn"),
   importReminderModal: document.getElementById("importReminderModal"),
   importReminderImportBtn: document.getElementById("importReminderImportBtn"),
   importReminderDismissBtn: document.getElementById("importReminderDismissBtn"),
@@ -296,8 +369,9 @@ const el = {
   supportBanner: document.getElementById("supportBanner"),
   supportBannerDismissBtn: document.getElementById("supportBannerDismissBtn"),
   supportBannerCoffeeLink: document.getElementById("supportBannerCoffeeLink"),
-  tabButtons: Array.from(document.querySelectorAll(".tab-btn")),
+  tabButtons: Array.from(document.querySelectorAll(".tab-btn[data-mode-target]")),
   tabPanels: Array.from(document.querySelectorAll(".tab-panel")),
+  tripSnapshotSection: document.querySelector(".trip-snapshot"),
   metricGrid: document.getElementById("metricGrid"),
   onboardingPanel: document.getElementById("onboardingPanel"),
   loadSampleTripBtn: document.getElementById("loadSampleTripBtn"),
@@ -325,9 +399,11 @@ const el = {
   dashboardTripMeta: document.getElementById("dashboardTripMeta"),
   dashboardCategoryBreakdownTitle: document.getElementById("dashboardCategoryBreakdownTitle"),
   tripSnapshotGrid: document.getElementById("tripSnapshotGrid"),
+  setupWizardCard: document.getElementById("setupWizardCard"),
   dashboardTimelineRange: document.getElementById("dashboardTimelineRange"),
   appToast: document.getElementById("appToast"),
   itineraryComposer: document.getElementById("itineraryComposer"),
+  planChecklist: document.getElementById("planChecklist"),
   itineraryList: document.getElementById("itineraryList"),
   costsComposer: document.getElementById("costsComposer"),
   costsList: document.getElementById("costsList"),
@@ -335,13 +411,17 @@ const el = {
   costItemsTableBody: document.querySelector("#costItemsTable tbody"),
   plannedBudgetPct: document.getElementById("plannedBudgetPct"),
   paidBudgetPct: document.getElementById("paidBudgetPct"),
+  budgetHealthState: document.getElementById("budgetHealthState"),
   plannedBudgetBar: document.getElementById("plannedBudgetBar"),
   paidBudgetBar: document.getElementById("paidBudgetBar"),
+  budgetProgressCard: document.querySelector(".dashboard-budget-panel .progress-card"),
   reportTripName: document.getElementById("reportTripName"),
   reportTripMeta: document.getElementById("reportTripMeta"),
   reportRate: document.getElementById("reportRate"),
   reportGenerated: document.getElementById("reportGenerated"),
   reportMetrics: document.getElementById("reportMetrics"),
+  reportCharts: document.getElementById("reportCharts"),
+  reportItinerarySummary: document.getElementById("reportItinerarySummary"),
   reportBreakdown: document.getElementById("reportBreakdown"),
   reportFamilySummary: document.getElementById("reportFamilySummary"),
   reportTimeline: document.getElementById("reportTimeline"),
@@ -416,35 +496,35 @@ const el = {
 
 function loadState() {
   const raw =
-    localStorage.getItem(STORAGE_KEY) ||
-    LEGACY_STORAGE_KEYS.map((key) => localStorage.getItem(key)).find(Boolean);
-  if (!raw) return normalizeImportedState(demoData);
+    storageGet(STORAGE_KEY) ||
+    LEGACY_STORAGE_KEYS.map((key) => storageGet(key)).find(Boolean);
+  if (!raw) return buildEmptyState();
   try {
     return normalizeImportedState(JSON.parse(raw));
   } catch {
-    return normalizeImportedState(demoData);
+    return buildEmptyState();
   }
 }
 
 function loadFamilyPrefs() {
-  const adults = Math.max(0, Number(localStorage.getItem(FAMILY_ADULTS_KEY)) || 2);
-  const children = Math.max(0, Number(localStorage.getItem(FAMILY_CHILDREN_KEY)) || 0);
-  const splitByRole = localStorage.getItem(FAMILY_SPLIT_TOGGLE_KEY) === "1";
+  const adults = Math.max(0, Number(storageGet(FAMILY_ADULTS_KEY)) || 2);
+  const children = Math.max(0, Number(storageGet(FAMILY_CHILDREN_KEY)) || 0);
+  const splitByRole = storageGet(FAMILY_SPLIT_TOGGLE_KEY) === "1";
   return { adults, children, splitByRole };
 }
 
 function saveFamilyPrefs() {
-  localStorage.setItem(FAMILY_ADULTS_KEY, String(Math.max(0, Number(familyPrefs.adults) || 0)));
-  localStorage.setItem(FAMILY_CHILDREN_KEY, String(Math.max(0, Number(familyPrefs.children) || 0)));
-  localStorage.setItem(FAMILY_SPLIT_TOGGLE_KEY, familyPrefs.splitByRole ? "1" : "0");
+  storageSet(FAMILY_ADULTS_KEY, String(Math.max(0, Number(familyPrefs.adults) || 0)));
+  storageSet(FAMILY_CHILDREN_KEY, String(Math.max(0, Number(familyPrefs.children) || 0)));
+  storageSet(FAMILY_SPLIT_TOGGLE_KEY, familyPrefs.splitByRole ? "1" : "0");
 }
 
 function isOnboardingDismissed() {
-  return localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "1";
+  return storageGet(ONBOARDING_DISMISSED_KEY) === "1";
 }
 
 function dismissOnboarding() {
-  localStorage.setItem(ONBOARDING_DISMISSED_KEY, "1");
+  storageSet(ONBOARDING_DISMISSED_KEY, "1");
   uiState.onboardingVisible = false;
   render();
 }
@@ -454,18 +534,433 @@ function syncOnboardingPanelVisibility() {
   el.onboardingPanel.hidden = !uiState.onboardingVisible;
 }
 
+function setupWizardStepComplete(step, summary = calculateSummary()) {
+  const s = state.settings || {};
+  const travelers = Math.max(0, Number(familyPrefs.adults) || 0) + Math.max(0, Number(familyPrefs.children) || 0);
+  if (step === 1) return Boolean((s.tripName || "").trim() && s.startDate && s.endDate);
+  if (step === 2) return (Number(s.totalBudgetCad) || 0) > 0 && travelers > 0 && Boolean(displayCurrencyCode());
+  if (step === 3) return (state.activities || []).length > 0;
+  if (step === 4) return (state.costItems || []).length > 0;
+  if (step === 5) return uiState.setupWizardMinimized;
+  return false;
+}
+
+function getSetupWizardStepStatuses(summary = calculateSummary()) {
+  return [1, 2, 3, 4, 5].map((step) => ({
+    step,
+    complete: setupWizardStepComplete(step, summary),
+  }));
+}
+
+function openSetupWizard({ step = 1, scroll = true } = {}) {
+  uiState.planningUnlocked = true;
+  uiState.setupWizardVisible = true;
+  uiState.setupWizardMinimized = false;
+  uiState.setupWizardStep = Math.min(5, Math.max(1, Number(step) || 1));
+  switchTab("plan");
+  render();
+  if (scroll && el.setupWizardCard) {
+    requestAnimationFrame(() => el.setupWizardCard.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+}
+
+function minimizeSetupWizard() {
+  uiState.setupWizardVisible = true;
+  uiState.setupWizardMinimized = true;
+  uiState.setupWizardStep = 5;
+}
+
+function closeSetupWizard() {
+  uiState.setupWizardVisible = false;
+  uiState.setupWizardMinimized = false;
+}
+
+function isPlanningLocked() {
+  return !uiState.planningUnlocked && !uiState.setupWizardVisible && !hasMeaningfulTripData();
+}
+
+function syncPlanningLockUi() {
+  const body = document.body;
+  if (!body) return;
+  body.classList.toggle("planning-locked", isPlanningLocked());
+  body.classList.toggle("setup-focus", uiState.setupWizardVisible && !uiState.setupWizardMinimized);
+}
+
+function enforcePlanningGatePanels() {
+  if (!isPlanningLocked()) return;
+  const planPanels = new Set(["itinerary", "settings"]);
+  el.tabPanels.forEach((panel) => {
+    if (planPanels.has(panel.dataset.tabPanel)) {
+      panel.hidden = true;
+      panel.classList.remove("active");
+    }
+  });
+}
+
+function saveSetupWizardBasicsStep() {
+  const tripNameInput = document.getElementById("setupTripName");
+  const startDateInput = document.getElementById("setupStartDate");
+  const endDateInput = document.getElementById("setupEndDate");
+  if (!tripNameInput || !startDateInput || !endDateInput) return false;
+  const tripName = tripNameInput.value.trim();
+  const startDate = startDateInput.value;
+  const endDate = endDateInput.value;
+  if (!tripName || !startDate || !endDate) {
+    showToast("Add trip name and dates to continue.");
+    return false;
+  }
+  if (endDate < startDate) {
+    showToast("End date must be after the start date.");
+    return false;
+  }
+  state.settings.tripName = tripName;
+  state.settings.startDate = startDate;
+  state.settings.endDate = endDate;
+  saveState();
+  return true;
+}
+
+function saveSetupWizardBudgetStep() {
+  const budgetInput = document.getElementById("setupBudget");
+  const currencyInput = document.getElementById("setupDisplayCurrency");
+  const adultsInput = document.getElementById("setupAdults");
+  const childrenInput = document.getElementById("setupChildren");
+  if (!budgetInput || !currencyInput || !adultsInput || !childrenInput) return false;
+
+  const displayCurrency = normalizeDisplayCurrency(currencyInput.value);
+  const budgetDisplay = Math.max(0, Number(budgetInput.value) || 0);
+  const adults = Math.max(0, Number(adultsInput.value) || 0);
+  const children = Math.max(0, Number(childrenInput.value) || 0);
+  const travelers = adults + children;
+  if (travelers <= 0) {
+    showToast("Add at least 1 traveler to continue.");
+    return false;
+  }
+  if (budgetDisplay <= 0) {
+    showToast("Add your budget to continue.");
+    return false;
+  }
+
+  state.settings.displayCurrency = displayCurrency;
+  state.settings.totalBudgetCad = displayToCad(budgetDisplay, displayCurrency);
+  state.settings.travelers = travelers;
+  familyPrefs.adults = adults;
+  familyPrefs.children = children;
+  saveFamilyPrefs();
+  saveState();
+  return true;
+}
+
+function setupWizardReviewRows(summary) {
+  const leftCad = (Number(state.settings.totalBudgetCad) || 0) - (Number(summary.plannedCad) || 0);
+  return [
+    ["Budget", moneyDisplayRoundedFromCad(state.settings.totalBudgetCad || 0)],
+    ["Forecast", moneyDisplayRoundedFromCad(summary.plannedCad || 0)],
+    ["Paid", moneyDisplayRoundedFromCad(summary.paidCad || 0)],
+    ["Remaining", moneyDisplayRoundedFromCad(leftCad)],
+    ["Status", leftCad >= 0 ? "On budget" : "Over budget"],
+  ];
+}
+
+function renderSetupWizard(summary) {
+  if (!el.setupWizardCard) return;
+  const visible = uiState.setupWizardVisible;
+  el.setupWizardCard.hidden = !visible;
+  if (!visible) return;
+
+  const steps = getSetupWizardStepStatuses(summary);
+  const currentStep = Math.min(5, Math.max(1, Number(uiState.setupWizardStep) || 1));
+  const progressPct = Math.round(((currentStep - 1) / 4) * 100);
+
+  if (uiState.setupWizardMinimized) {
+    el.setupWizardCard.classList.add("is-minimized");
+    el.setupWizardCard.innerHTML = `
+      <div class="setup-wizard-minibar">
+        <div>
+          <p class="setup-wizard-kicker">Setup Complete</p>
+          <strong>Trip setup is ready.</strong>
+          <p class="muted small-copy">You can reopen the steps any time to adjust the basics.</p>
+        </div>
+        <div class="setup-wizard-mini-actions">
+          <button type="button" class="btn btn-secondary control-btn" data-action="wizardReopen">Reopen setup</button>
+          <button type="button" class="icon-btn" data-action="wizardClose" aria-label="Close setup summary">Dismiss</button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  el.setupWizardCard.classList.remove("is-minimized");
+
+  const travelers = Math.max(0, Number(familyPrefs.adults) || 0) + Math.max(0, Number(familyPrefs.children) || 0);
+  const stepTitles = [
+    "Trip Basics",
+    "Budget + Travelers",
+    "Build Itinerary",
+    "Add Other Costs",
+    "Review vs Budget",
+  ];
+
+  let bodyHtml = "";
+  let canContinue = true;
+  let nextLabel = currentStep === 5 ? "Finish Setup" : "Continue";
+  let nextAction = currentStep === 5 ? "wizardFinish" : "wizardNext";
+  let secondaryHtml = currentStep > 1 ? `<button type="button" class="btn btn-secondary control-btn" data-action="wizardBack">Back</button>` : "";
+
+  if (currentStep === 1) {
+    canContinue = Boolean((state.settings.tripName || "").trim() && state.settings.startDate && state.settings.endDate);
+    bodyHtml = `
+      <div class="setup-wizard-fields">
+        <label class="form-span-full">
+          Trip name
+          <input id="setupTripName" type="text" value="${escapeHtml(state.settings.tripName || "")}" placeholder="Summer Vacation" />
+        </label>
+        <label>
+          Start date
+          <input id="setupStartDate" type="date" value="${escapeHtml(state.settings.startDate || "")}" />
+        </label>
+        <label>
+          End date
+          <input id="setupEndDate" type="date" value="${escapeHtml(state.settings.endDate || "")}" />
+        </label>
+      </div>
+    `;
+  } else if (currentStep === 2) {
+    canContinue = (Number(state.settings.totalBudgetCad) || 0) > 0 && travelers > 0;
+    bodyHtml = `
+      <div class="setup-wizard-fields">
+        <label>
+          Budget
+          <input id="setupBudget" type="number" min="0" step="0.01" value="${cadToDisplay(state.settings.totalBudgetCad || 0).toFixed(2)}" />
+        </label>
+        <label>
+          Planning currency
+          <select id="setupDisplayCurrency">
+            <option value="USD" ${displayCurrencyCode() === "USD" ? "selected" : ""}>USD</option>
+            <option value="CAD" ${displayCurrencyCode() === "CAD" ? "selected" : ""}>CAD</option>
+            <option value="EUR" ${displayCurrencyCode() === "EUR" ? "selected" : ""}>EUR</option>
+          </select>
+        </label>
+        <label>
+          Adults
+          <input id="setupAdults" type="number" min="0" step="1" value="${Math.max(0, Number(familyPrefs.adults) || 0)}" />
+        </label>
+        <label>
+          Kids
+          <input id="setupChildren" type="number" min="0" step="1" value="${Math.max(0, Number(familyPrefs.children) || 0)}" />
+        </label>
+      </div>
+    `;
+  } else if (currentStep === 3) {
+    canContinue = (state.activities || []).length > 0;
+    nextLabel = canContinue ? "Continue" : "Skip for now";
+    const wizardItinFormOpen = uiState.itineraryFormPlacement?.type === "wizard-new";
+    bodyHtml = `
+      <div class="setup-wizard-step-note">
+        <p><strong>${(state.activities || []).length}</strong> itinerary item${(state.activities || []).length === 1 ? "" : "s"} added.</p>
+        <p class="muted">Start by adding flights, hotel, and one activity. You can add more later.</p>
+      </div>
+      <div class="setup-wizard-inline-actions">
+        <button type="button" class="btn btn-primary" data-action="wizardOpenItinerary">${wizardItinFormOpen ? "Hide itinerary form" : "Add itinerary item"}</button>
+        <button type="button" class="btn btn-secondary control-btn" data-action="wizardJumpTab" data-tab="itinerary">Open full Itinerary tab</button>
+      </div>
+      <div class="setup-wizard-form-slot" data-inline-slot="wizard-itinerary-new"></div>
+    `;
+  } else if (currentStep === 4) {
+    canContinue = (state.costItems || []).length > 0;
+    nextLabel = canContinue ? "Continue" : "Skip for now";
+    const wizardCostFormOpen = uiState.costFormPlacement?.type === "wizard-new";
+    bodyHtml = `
+      <div class="setup-wizard-step-note">
+        <p><strong>${(state.costItems || []).length}</strong> other cost item${(state.costItems || []).length === 1 ? "" : "s"} added.</p>
+        <p class="muted">Add insurance, parking, supplies, or any costs that are not activities.</p>
+      </div>
+      <div class="setup-wizard-inline-actions">
+        <button type="button" class="btn btn-primary" data-action="wizardOpenCosts">${wizardCostFormOpen ? "Hide cost form" : "Add other cost"}</button>
+        <button type="button" class="btn btn-secondary control-btn" data-action="wizardJumpTab" data-tab="costs">Open full Costs tab</button>
+      </div>
+      <div class="setup-wizard-form-slot" data-inline-slot="wizard-cost-new"></div>
+    `;
+  } else {
+    const rows = setupWizardReviewRows(summary)
+      .map(
+        ([label, value]) => `
+          <div class="setup-wizard-review-row">
+            <span>${escapeHtml(label)}</span>
+            <strong>${escapeHtml(value)}</strong>
+          </div>
+        `
+      )
+      .join("");
+    bodyHtml = `
+      <div class="setup-wizard-step-note">
+        <p class="muted">Quick review before you start working in the planner tabs.</p>
+      </div>
+      <div class="setup-wizard-review">${rows}</div>
+      <div class="setup-wizard-inline-actions">
+        <button type="button" class="btn btn-secondary control-btn" data-action="wizardJumpTab" data-tab="dashboard">Open Dashboard</button>
+        <button type="button" class="btn btn-secondary control-btn" data-action="wizardJumpTab" data-tab="report">Open Report</button>
+      </div>
+    `;
+  }
+
+  el.setupWizardCard.innerHTML = `
+    <div class="setup-wizard-shell" role="region" aria-labelledby="setupWizardTitle">
+      <div class="setup-wizard-head">
+        <div>
+          <p class="setup-wizard-kicker">Guided Setup</p>
+          <h3 id="setupWizardTitle">Start Planning in 5 steps</h3>
+          <p class="muted">Add the basics now. You can refine everything later.</p>
+        </div>
+        <button type="button" class="icon-btn" data-action="wizardMinimize" aria-label="Minimize setup card">Minimize</button>
+      </div>
+      <div class="setup-wizard-progress" aria-label="Setup progress">
+        <div class="setup-wizard-progress-bar" aria-hidden="true">
+          <span style="width:${progressPct}%"></span>
+        </div>
+        <div class="setup-wizard-steps">
+          ${steps
+            .map(
+              ({ step, complete }) => `
+                <button type="button" class="setup-step-chip ${step === currentStep ? "is-active" : ""} ${complete ? "is-complete" : ""}" data-action="wizardGoStep" data-step="${step}" aria-label="Step ${step}: ${stepTitles[step - 1]}">
+                  <span class="dot">${complete ? "✓" : step}</span>
+                  <span class="label">${stepTitles[step - 1]}</span>
+                </button>
+              `
+            )
+            .join("")}
+        </div>
+      </div>
+      <div class="setup-wizard-body">
+        <div class="setup-wizard-step-title">
+          <span>Step ${currentStep} of 5</span>
+          <strong>${stepTitles[currentStep - 1]}</strong>
+        </div>
+        ${bodyHtml}
+      </div>
+      <div class="setup-wizard-footer">
+        <div class="setup-wizard-footer-left">
+          ${secondaryHtml}
+        </div>
+        <div class="setup-wizard-footer-right">
+          <button type="button" class="btn btn-secondary control-btn" data-action="wizardClose">Close</button>
+          <button type="button" class="btn btn-primary" data-action="${nextAction}">${nextLabel}</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function handleSetupWizardClick(event) {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+  const action = button.dataset.action;
+  if (!action) return;
+
+  if (action === "wizardClose") {
+    closeSetupWizard();
+    render();
+    return;
+  }
+  if (action === "wizardMinimize") {
+    minimizeSetupWizard();
+    render();
+    return;
+  }
+  if (action === "wizardReopen") {
+    uiState.setupWizardVisible = true;
+    uiState.setupWizardMinimized = false;
+    render();
+    return;
+  }
+  if (action === "wizardBack") {
+    uiState.setupWizardStep = Math.max(1, uiState.setupWizardStep - 1);
+    render();
+    return;
+  }
+  if (action === "wizardGoStep") {
+    uiState.setupWizardStep = Math.min(5, Math.max(1, Number(button.dataset.step) || 1));
+    render();
+    return;
+  }
+  if (action === "wizardJumpTab") {
+    switchTab(button.dataset.tab || "dashboard");
+    render();
+    return;
+  }
+  if (action === "wizardOpenItinerary") {
+    let shouldFocus = false;
+    if (uiState.itineraryFormPlacement?.type === "wizard-new") {
+      hideItineraryInlineForm();
+    } else {
+      showItineraryNewItemFormInWizard();
+      shouldFocus = true;
+      if (uiState.costFormPlacement?.type === "wizard-new") {
+        hideCostInlineForm();
+        resetCostItemForm();
+      }
+    }
+    render();
+    if (shouldFocus) requestAnimationFrame(() => el.activityInputs.title?.focus());
+    return;
+  }
+  if (action === "wizardOpenCosts") {
+    let shouldFocus = false;
+    if (uiState.costFormPlacement?.type === "wizard-new") {
+      hideCostInlineForm();
+    } else {
+      showCostNewItemFormInWizard();
+      shouldFocus = true;
+      if (uiState.itineraryFormPlacement?.type === "wizard-new") {
+        hideItineraryInlineForm();
+        resetActivityForm();
+      }
+    }
+    render();
+    if (shouldFocus) requestAnimationFrame(() => el.costItemInputs.title?.focus());
+    return;
+  }
+  if (action === "wizardNext") {
+    if (uiState.setupWizardStep === 1 && !saveSetupWizardBasicsStep()) return;
+    if (uiState.setupWizardStep === 2 && !saveSetupWizardBudgetStep()) return;
+    uiState.setupWizardStep = Math.min(5, uiState.setupWizardStep + 1);
+    render();
+    return;
+  }
+  if (action === "wizardFinish") {
+    minimizeSetupWizard();
+    switchTab("plan");
+    render();
+  }
+}
+
 function buildEmptyState() {
+  let existingCustomCategories = [];
+  let adultsSeed = 2;
+  let childrenSeed = 0;
+  try {
+    existingCustomCategories = Array.isArray(state?.settings?.customCategories) ? state.settings.customCategories : [];
+  } catch {
+    existingCustomCategories = [];
+  }
+  try {
+    adultsSeed = Math.max(0, Number(familyPrefs?.adults) || Number(storageGet(FAMILY_ADULTS_KEY)) || 2);
+    childrenSeed = Math.max(0, Number(familyPrefs?.children) || Number(storageGet(FAMILY_CHILDREN_KEY)) || 0);
+  } catch {
+    adultsSeed = 2;
+    childrenSeed = 0;
+  }
   return normalizeImportedState({
     settings: {
       tripName: "",
-      travelers: Math.max(1, (Number(familyPrefs.adults) || 0) + (Number(familyPrefs.children) || 0) || 2),
+      travelers: Math.max(1, adultsSeed + childrenSeed || 2),
       startDate: "",
       endDate: "",
       totalBudgetCad: 0,
       displayCurrency: "USD",
       usdToCadRate: 1.36,
       eurToCadRate: 1.47,
-      customCategories: state?.settings?.customCategories || [],
+      customCategories: existingCustomCategories,
     },
     activities: [],
     costItems: [],
@@ -473,13 +968,15 @@ function buildEmptyState() {
   });
 }
 
+migrateLegacySeededDemoToBlank();
+
 function saveState(markDirty = true) {
   if (markDirty) {
     state.meta = state.meta || {};
     state.meta.backup = state.meta.backup || {};
     state.meta.backup.lastDataChangeAt = new Date().toISOString();
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  storageSet(STORAGE_KEY, JSON.stringify(state));
   if (markDirty) {
     maybeQueueSupportBannerAfterMeaningfulAction();
   }
@@ -659,7 +1156,7 @@ function compactCad(value) {
 }
 
 function loadStoredFormMode(key) {
-  const saved = String(localStorage.getItem(key) || "").toLowerCase();
+  const saved = String(storageGet(key) || "").toLowerCase();
   return saved === "advanced" ? "advanced" : "basic";
 }
 
@@ -708,13 +1205,13 @@ function getCostFormUiMode() {
 
 function setItineraryFormUiMode(mode) {
   const normalized = mode === "advanced" ? "advanced" : "basic";
-  localStorage.setItem(ITIN_FORM_MODE_KEY, normalized);
+  storageSet(ITIN_FORM_MODE_KEY, normalized);
   applyFormMode(el.activityForm, normalized, el.activityFormModeButtons);
 }
 
 function setCostFormUiMode(mode) {
   const normalized = mode === "advanced" ? "advanced" : "basic";
-  localStorage.setItem(COST_FORM_MODE_KEY, normalized);
+  storageSet(COST_FORM_MODE_KEY, normalized);
   applyFormMode(el.costItemForm, normalized, el.costItemFormModeButtons);
 }
 
@@ -788,7 +1285,7 @@ function renderBackupUi() {
 
 function isSupportBannerDismissed() {
   try {
-    return localStorage.getItem(SUPPORT_BANNER_DISMISSED_KEY) === "1";
+    return storageGet(SUPPORT_BANNER_DISMISSED_KEY) === "1";
   } catch {
     return false;
   }
@@ -796,7 +1293,7 @@ function isSupportBannerDismissed() {
 
 function hasSupportBannerShown() {
   try {
-    return localStorage.getItem(SUPPORT_BANNER_SHOWN_KEY) === "1";
+    return storageGet(SUPPORT_BANNER_SHOWN_KEY) === "1";
   } catch {
     return false;
   }
@@ -804,7 +1301,7 @@ function hasSupportBannerShown() {
 
 function markSupportBannerShown() {
   try {
-    localStorage.setItem(SUPPORT_BANNER_SHOWN_KEY, "1");
+    storageSet(SUPPORT_BANNER_SHOWN_KEY, "1");
   } catch {
     // Ignore storage errors; banner will simply be less persistent.
   }
@@ -812,15 +1309,21 @@ function markSupportBannerShown() {
 
 function markSupportBannerDismissed() {
   try {
-    localStorage.setItem(SUPPORT_BANNER_DISMISSED_KEY, "1");
+    storageSet(SUPPORT_BANNER_DISMISSED_KEY, "1");
   } catch {
     // Ignore storage errors; banner will simply be less persistent.
   }
 }
 
-function maybeQueueSupportBannerAfterMeaningfulAction() {
+function maybeQueueSupportBannerAfterMeaningfulAction(trigger = "save") {
   if (!uiState.appReady) return;
   if (isSupportBannerDismissed() || hasSupportBannerShown()) return;
+  const activityCount = (state.activities || []).length;
+  const costCount = (state.costItems || []).length;
+  const paidCount = [...(state.activities || []), ...(state.costItems || [])].filter((item) => (Number(item.paidUsd) || 0) > 0).length;
+  const reachedValueMoment =
+    trigger === "export" || trigger === "print" || activityCount >= 5 || costCount >= 5 || paidCount >= 3;
+  if (!reachedValueMoment) return;
   uiState.supportBannerQueued = true;
   renderSupportUi();
 }
@@ -854,6 +1357,7 @@ function dismissSupportBanner({ permanent = true } = {}) {
 }
 
 function getActiveModalElement() {
+  if (uiState.appMenuOpen && el.appMenu && !el.appMenu.hidden) return el.appMenu;
   if (uiState.importReminderOpen && el.importReminderModal && !el.importReminderModal.hidden) return el.importReminderModal;
   if (uiState.aboutModalOpen && el.aboutModal && !el.aboutModal.hidden) return el.aboutModal;
   if (uiState.dashboardDayModalOpen && el.dashboardDayDetail && !el.dashboardDayDetail.hidden) return el.dashboardDayDetail;
@@ -958,10 +1462,7 @@ function syncFamilyPrefsFromTravelerCount(travelerCount) {
 }
 
 function startPlanningFromHero() {
-  switchTab("itinerary");
-  showItineraryNewItemForm();
-  render();
-  requestAnimationFrame(() => el.activityInputs.title?.focus());
+  openSetupWizard({ step: 1, scroll: true });
 }
 
 function loadSampleTripFromOnboarding() {
@@ -970,11 +1471,10 @@ function loadSampleTripFromOnboarding() {
 
 function startEmptyTripFromOnboarding() {
   state = buildEmptyState();
-  localStorage.setItem(ONBOARDING_DISMISSED_KEY, "1");
+  storageSet(ONBOARDING_DISMISSED_KEY, "1");
   uiState.onboardingVisible = false;
   saveState();
-  switchTab("settings");
-  render();
+  openSetupWizard({ step: 1, scroll: true });
 }
 
 function handleAboutModalClick(event) {
@@ -1171,10 +1671,10 @@ function resetActivityForm() {
   el.activityFormCancelEdit.hidden = true;
 }
 
-function setActivityFormEditMode(item) {
+function setActivityFormEditMode(item, { placementType = "edit" } = {}) {
   const inputs = el.activityInputs;
   uiState.itineraryEditId = item.id;
-  uiState.itineraryFormPlacement = { type: "edit", id: item.id };
+  uiState.itineraryFormPlacement = { type: placementType, id: item.id };
   inputs.mode.value = "edit";
   inputs.editId.value = item.id;
   inputs.date.value = item.date || "";
@@ -1201,6 +1701,25 @@ function showItineraryNewItemForm() {
   el.activityFormCancelEdit.hidden = false;
 }
 
+function showItineraryNewItemFormForDate(date) {
+  uiState.itineraryFormPlacement = { type: "new-day", date: date || "" };
+  resetActivityForm();
+  uiState.itineraryFormPlacement = { type: "new-day", date: date || "" };
+  if (el.activityInputs?.date && date) {
+    el.activityInputs.date.value = date;
+  }
+  el.activityFormCancelEdit.textContent = "Cancel";
+  el.activityFormCancelEdit.hidden = false;
+}
+
+function showItineraryNewItemFormInWizard() {
+  uiState.itineraryFormPlacement = { type: "wizard-new" };
+  resetActivityForm();
+  uiState.itineraryFormPlacement = { type: "wizard-new" };
+  el.activityFormCancelEdit.textContent = "Cancel";
+  el.activityFormCancelEdit.hidden = false;
+}
+
 function hideItineraryInlineForm() {
   uiState.itineraryFormPlacement = null;
   uiState.itineraryEditId = null;
@@ -1221,6 +1740,12 @@ function mountItineraryFormInline() {
   let slot = null;
   if (placement.type === "new") {
     slot = composer.querySelector('[data-inline-slot="new"]');
+  } else if (placement.type === "wizard-new") {
+    slot = el.setupWizardCard?.querySelector('[data-inline-slot="wizard-itinerary-new"]') || null;
+  } else if (placement.type === "new-day" && placement.date) {
+    slot = list.querySelector(`[data-inline-slot="day-new"][data-date="${placement.date}"]`);
+  } else if (placement.type === "edit-cost-hub" && placement.id) {
+    slot = el.costsList?.querySelector(`[data-inline-slot="cost-hub-activity-edit"][data-item-id="${placement.id}"]`) || null;
   } else if (placement.type === "edit" && placement.id) {
     slot = list.querySelector(`[data-inline-slot="edit"][data-item-id="${placement.id}"]`);
   }
@@ -1230,6 +1755,55 @@ function mountItineraryFormInline() {
   }
   slot.appendChild(form);
   form.hidden = false;
+}
+
+function getItineraryPlannerDays(summary) {
+  const byDate = new Map();
+  (summary.activities || []).forEach((item) => {
+    if (!item.date) return;
+    if (!byDate.has(item.date)) byDate.set(item.date, []);
+    byDate.get(item.date).push(item);
+  });
+
+  const sortByTimeThenTitle = (a, b) => `${a.time || ""} ${a.title || ""}`.localeCompare(`${b.time || ""} ${b.title || ""}`);
+  byDate.forEach((items) => items.sort(sortByTimeThenTitle));
+
+  const tripStart = parseDateOnly(state.settings.startDate);
+  const tripEnd = parseDateOnly(state.settings.endDate);
+  const hasTripRange = Boolean(tripStart && tripEnd && tripEnd >= tripStart);
+  const dayFmt = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const fullFmt = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" });
+
+  const days = [];
+  if (hasTripRange) {
+    for (let d = new Date(tripStart); d <= tripEnd; d = addDays(d, 1)) {
+      const key = formatDateInput(d);
+      days.push({
+        key,
+        shortLabel: dayFmt.format(d),
+        fullLabel: fullFmt.format(d),
+        items: byDate.get(key) || [],
+      });
+    }
+  } else {
+    Array.from(byDate.keys())
+      .sort()
+      .forEach((key) => {
+        const d = parseDateOnly(key);
+        days.push({
+          key,
+          shortLabel: d ? dayFmt.format(d) : key,
+          fullLabel: d ? fullFmt.format(d) : key,
+          items: byDate.get(key) || [],
+        });
+      });
+  }
+
+  const unscheduled = (summary.activities || [])
+    .filter((item) => !item.date)
+    .sort(sortByTimeThenTitle);
+
+  return { days, unscheduled, hasTripRange };
 }
 
 function renderItineraryList(summary) {
@@ -1245,52 +1819,111 @@ function renderItineraryList(summary) {
     </div>
   `;
 
-  el.itineraryList.innerHTML = summary.activities.length
-    ? summary.activities
-        .map(
-          (item) => `
-            <div class="itinerary-row">
-              <div class="itinerary-card">
-                <div class="itinerary-card-main">
-                  <div class="itinerary-card-head">
-                    <div class="itinerary-card-title-wrap">
-                      <span class="itinerary-card-date-title">${shortDate(item.date)} • ${item.time || "--:--"}</span>
-                      <strong>${escapeHtml(item.title)}</strong>
-                    </div>
-                    <span class="status-pill status-${item.status}">${item.status}</span>
-                  </div>
-                  <div class="itinerary-card-meta">
-                    <span>${escapeHtml(item.category)}</span>
-                    <span>${normalizeCurrency(item.currency)}</span>
-                  </div>
-                  <div class="itinerary-card-sub muted">${escapeHtml(item.location || "Location TBD")}</div>
-                  ${item.notes ? `<div class="itinerary-card-notes muted">${escapeHtml(item.notes)}</div>` : ""}
-                  <div class="itinerary-card-costs">
-                    <div><span class="muted">Forecast</span> ${formatEnteredMoney(item.plannedUsd, item.currency)} <span class="muted">(${money(amountToCad(item.plannedUsd, item.currency), "CAD")})</span></div>
-                    <div><span class="muted">Paid</span> ${formatEnteredMoney(item.paidUsd, item.currency)} <span class="muted">(${money(amountToCad(item.paidUsd, item.currency), "CAD")})</span></div>
-                  </div>
-                </div>
-                <div class="itinerary-card-actions">
-                  <button class="icon-btn" data-action="itineraryEditInline" data-id="${item.id}">Edit</button>
-                  <button class="icon-btn" data-action="markPaid" data-id="${item.id}">Mark Paid</button>
-                  <button class="icon-btn danger" data-action="delete" data-id="${item.id}">Delete</button>
-                </div>
-              </div>
-              <div class="day-detail-inline-slot" data-inline-slot="edit" data-item-id="${item.id}"></div>
+  const planner = getItineraryPlannerDays(summary);
+  const hasPlannerContent = planner.days.length || planner.unscheduled.length;
+
+  const renderPlannerItem = (item) => {
+    const isEditing = uiState.itineraryFormPlacement?.type === "edit" && uiState.itineraryEditId === item.id;
+    return `
+      <div class="itinerary-row">
+        <details class="itinerary-plan-item"${isEditing ? " open" : ""}>
+          <summary class="itinerary-plan-summary">
+            <span class="itinerary-plan-time">${escapeHtml(item.time || "--:--")}</span>
+            <span class="itinerary-plan-title">${escapeHtml(item.title)}</span>
+            <span class="itinerary-plan-status status-pill status-${item.status}">${item.status}</span>
+          </summary>
+          <div class="itinerary-plan-body">
+            <div class="itinerary-plan-meta muted">
+              <span>${escapeHtml(item.location || "Location TBD")}</span>
+              <span>${escapeHtml(item.category)}</span>
+              <span>${normalizeCurrency(item.currency)}</span>
             </div>
-          `
-        )
-        .join("")
+            ${item.notes ? `<p class="itinerary-plan-notes muted">${escapeHtml(item.notes)}</p>` : ""}
+            <div class="itinerary-plan-costs">
+              <span><strong>Forecast:</strong> ${formatEnteredMoney(item.plannedUsd, item.currency)}</span>
+              <span class="muted">(${money(amountToCad(item.plannedUsd, item.currency), "CAD")})</span>
+              <span><strong>Paid:</strong> ${formatEnteredMoney(item.paidUsd, item.currency)}</span>
+              <span class="muted">(${money(amountToCad(item.paidUsd, item.currency), "CAD")})</span>
+            </div>
+            <div class="itinerary-card-actions itinerary-plan-actions">
+              <button class="icon-btn" data-action="itineraryEditInline" data-id="${item.id}">Edit</button>
+              <button class="icon-btn" data-action="markPaid" data-id="${item.id}">Mark Paid</button>
+              <button class="icon-btn danger" data-action="delete" data-id="${item.id}">Delete</button>
+            </div>
+          </div>
+        </details>
+        <div class="day-detail-inline-slot" data-inline-slot="edit" data-item-id="${item.id}"></div>
+      </div>
+    `;
+  };
+
+  const dayBlocks = planner.days
+    .map(
+      (day) => `
+        <section class="itinerary-day-block">
+          <div class="itinerary-day-head">
+            <div>
+              <h4>${escapeHtml(day.shortLabel)}</h4>
+              <p class="muted small-copy">${escapeHtml(day.fullLabel)}</p>
+            </div>
+            <div class="itinerary-day-head-actions">
+              <span class="itinerary-day-count">${day.items.length} item${day.items.length === 1 ? "" : "s"}</span>
+              <button type="button" class="icon-btn itinerary-day-add-btn" data-action="showItineraryNewItemForDay" data-date="${day.key}" aria-label="Add itinerary item for ${escapeHtml(day.fullLabel)}" title="Add item for this day">+</button>
+            </div>
+          </div>
+          <div class="itinerary-day-body">
+            ${
+              day.items.length
+                ? day.items.map(renderPlannerItem).join("")
+                : `<div class="itinerary-day-empty muted">No activities planned yet.</div>`
+            }
+            <div class="day-detail-inline-slot" data-inline-slot="day-new" data-date="${day.key}"></div>
+          </div>
+        </section>
+      `
+    )
+    .join("");
+
+  const unscheduledBlock = planner.unscheduled.length
+    ? `
+      <section class="itinerary-day-block itinerary-day-block-unscheduled">
+        <div class="itinerary-day-head">
+          <div>
+            <h4>Unscheduled</h4>
+            <p class="muted small-copy">Items without a date</p>
+          </div>
+          <span class="itinerary-day-count">${planner.unscheduled.length} item${planner.unscheduled.length === 1 ? "" : "s"}</span>
+        </div>
+        <div class="itinerary-day-body">
+          ${planner.unscheduled.map(renderPlannerItem).join("")}
+        </div>
+      </section>
+    `
+    : "";
+
+  el.itineraryList.innerHTML = hasPlannerContent
+    ? `
+      ${
+        planner.hasTripRange
+          ? ""
+          : `<p class="muted small-copy itinerary-planner-note">Set trip start and end dates in Settings to view every day of your trip.</p>`
+      }
+      ${dayBlocks}
+      ${unscheduledBlock}
+    `
     : renderActionEmptyState({
         title: "No itinerary items yet",
         body: "Add your first activity to start planning your trip timeline.",
         actionPrefix: "itineraryEmpty",
       });
 
-  if (uiState.itineraryFormPlacement?.type === "edit" && uiState.itineraryEditId) {
+  if (
+    (uiState.itineraryFormPlacement?.type === "edit" || uiState.itineraryFormPlacement?.type === "edit-cost-hub") &&
+    uiState.itineraryEditId
+  ) {
     const active = summary.activities.find((item) => item.id === uiState.itineraryEditId);
     if (active) {
-      setActivityFormEditMode(active);
+      setActivityFormEditMode(active, { placementType: uiState.itineraryFormPlacement.type });
     } else {
       resetActivityForm();
       uiState.itineraryFormPlacement = null;
@@ -1298,6 +1931,20 @@ function renderItineraryList(summary) {
   } else if (uiState.itineraryFormPlacement?.type === "new") {
     resetActivityForm();
     uiState.itineraryFormPlacement = { type: "new" };
+    el.activityFormCancelEdit.textContent = "Cancel";
+    el.activityFormCancelEdit.hidden = false;
+  } else if (uiState.itineraryFormPlacement?.type === "wizard-new") {
+    resetActivityForm();
+    uiState.itineraryFormPlacement = { type: "wizard-new" };
+    el.activityFormCancelEdit.textContent = "Cancel";
+    el.activityFormCancelEdit.hidden = false;
+  } else if (uiState.itineraryFormPlacement?.type === "new-day") {
+    const targetDate = uiState.itineraryFormPlacement.date || "";
+    resetActivityForm();
+    uiState.itineraryFormPlacement = { type: "new-day", date: targetDate };
+    if (el.activityInputs?.date && targetDate) {
+      el.activityInputs.date.value = targetDate;
+    }
     el.activityFormCancelEdit.textContent = "Cancel";
     el.activityFormCancelEdit.hidden = false;
   } else {
@@ -1356,6 +2003,14 @@ function showCostNewItemForm() {
   el.costItemFormCancelEdit.hidden = false;
 }
 
+function showCostNewItemFormInWizard() {
+  uiState.costFormPlacement = { type: "wizard-new" };
+  resetCostItemForm();
+  uiState.costFormPlacement = { type: "wizard-new" };
+  el.costItemFormCancelEdit.textContent = "Cancel";
+  el.costItemFormCancelEdit.hidden = false;
+}
+
 function hideCostInlineForm() {
   uiState.costFormPlacement = null;
   uiState.costItemEditId = null;
@@ -1375,6 +2030,8 @@ function mountCostFormInline() {
   let slot = null;
   if (placement.type === "new") {
     slot = composer.querySelector('[data-inline-slot="new"]');
+  } else if (placement.type === "wizard-new") {
+    slot = el.setupWizardCard?.querySelector('[data-inline-slot="wizard-cost-new"]') || null;
   } else if (placement.type === "edit" && placement.id) {
     slot = list.querySelector(`[data-inline-slot="edit"][data-item-id="${placement.id}"]`);
   }
@@ -1384,6 +2041,63 @@ function mountCostFormInline() {
   }
   slot.appendChild(form);
   form.hidden = false;
+}
+
+function getCostHubGroups(summary) {
+  const itineraryEntries = [];
+  const generalEntries = [];
+
+  (summary.activities || []).forEach((item) => {
+    itineraryEntries.push({
+      kind: "activity",
+      id: item.id,
+      title: item.title,
+      category: item.category,
+      currency: normalizeCurrency(item.currency),
+      plannedUsd: Number(item.plannedUsd) || 0,
+      paidUsd: Number(item.paidUsd) || 0,
+      status: item.status || "Planned",
+      date: item.date || "",
+      time: item.time || "",
+      location: item.location || "",
+      notes: item.notes || "",
+      sourceLabel: "Itinerary activity",
+    });
+  });
+
+  (summary.costItems || []).forEach((item) => {
+    const base = {
+      kind: "costItem",
+      id: item.id,
+      title: item.title,
+      category: item.category,
+      currency: normalizeCurrency(item.currency),
+      plannedUsd: Number(item.plannedUsd) || 0,
+      paidUsd: Number(item.paidUsd) || 0,
+      status: item.includeInItinerary ? item.itineraryStatus || "Planned" : "Cost",
+      date: item.includeInItinerary ? item.itineraryDate || "" : "",
+      time: item.includeInItinerary ? item.itineraryTime || "" : "",
+      location: item.includeInItinerary ? item.itineraryLocation || "" : "",
+      notes: item.notes || "",
+      sourceLabel: item.includeInItinerary ? "Itinerary-linked cost" : "General cost",
+      includeInItinerary: Boolean(item.includeInItinerary),
+    };
+    if (item.includeInItinerary) {
+      itineraryEntries.push(base);
+    } else {
+      generalEntries.push(base);
+    }
+  });
+
+  const sortBySchedule = (a, b) => {
+    const aKey = `${a.date || "9999-12-31"}T${a.time || "23:59"} ${a.title || ""}`;
+    const bKey = `${b.date || "9999-12-31"}T${b.time || "23:59"} ${b.title || ""}`;
+    return aKey.localeCompare(bKey);
+  };
+  itineraryEntries.sort(sortBySchedule);
+  generalEntries.sort((a, b) => `${a.category || ""} ${a.title || ""}`.localeCompare(`${b.category || ""} ${b.title || ""}`));
+
+  return { itineraryEntries, generalEntries };
 }
 
 function renderCostsList(summary) {
@@ -1398,47 +2112,111 @@ function renderCostsList(summary) {
     </div>
   `;
 
-  el.costsList.innerHTML = summary.costItems.length
-    ? summary.costItems
-        .map((item) => {
-          const itineraryMeta = item.includeInItinerary
-            ? `${shortDate(item.itineraryDate)}${item.itineraryTime ? ` • ${item.itineraryTime}` : ""}${item.itineraryLocation ? ` • ${item.itineraryLocation}` : ""}`
-            : "Not shown on itinerary";
-          return `
-            <div class="itinerary-row">
-              <div class="itinerary-card">
-                <div class="itinerary-card-main">
-                  <div class="itinerary-card-head">
-                    <div class="itinerary-card-title-wrap">
-                      <span class="itinerary-card-date-title">${item.includeInItinerary ? "Itinerary-linked cost" : "Additional cost item"}</span>
-                      <strong>${escapeHtml(item.title)}</strong>
-                    </div>
-                    <span class="status-pill status-${item.itineraryStatus || "Planned"}">${item.includeInItinerary ? (item.itineraryStatus || "Planned") : "Cost"}</span>
-                  </div>
-                  <div class="itinerary-card-meta">
-                    <span>${escapeHtml(item.category)}</span>
-                    <span>${normalizeCurrency(item.currency)}</span>
-                    <span>${item.includeInItinerary ? "On Itinerary" : "Not on Itinerary"}</span>
-                  </div>
-                  <div class="itinerary-card-sub muted">${escapeHtml(itineraryMeta)}</div>
-                  ${item.notes ? `<div class="itinerary-card-notes muted">${escapeHtml(item.notes)}</div>` : ""}
-                  <div class="itinerary-card-costs">
-                    <div><span class="muted">Forecast</span> ${formatEnteredMoney(item.plannedUsd, item.currency)} <span class="muted">(${money(amountToCad(item.plannedUsd, item.currency), "CAD")})</span></div>
-                    <div><span class="muted">Paid</span> ${formatEnteredMoney(item.paidUsd, item.currency)} <span class="muted">(${money(amountToCad(item.paidUsd, item.currency), "CAD")})</span></div>
-                  </div>
-                </div>
-                <div class="itinerary-card-actions">
-                  <button class="icon-btn" data-action="costEditInline" data-id="${item.id}">Edit</button>
-                  <button class="icon-btn" data-action="markCostItemPaid" data-id="${item.id}">Mark Paid</button>
-                  <button class="icon-btn danger" data-action="deleteCostItem" data-id="${item.id}">Delete</button>
-                </div>
-              </div>
-              <div class="day-detail-inline-slot" data-inline-slot="edit" data-item-id="${item.id}"></div>
+  const groups = getCostHubGroups(summary);
+  const totalItems = groups.itineraryEntries.length + groups.generalEntries.length;
+  const outstandingCad = Math.max(0, summary.plannedCad - summary.paidCad);
+
+  const renderCostHubEntry = (entry) => {
+    const isCostItem = entry.kind === "costItem";
+    const isEditing = isCostItem && uiState.costFormPlacement?.type === "edit" && uiState.costItemEditId === entry.id;
+    const scheduleMeta = entry.date
+      ? `${shortDate(entry.date)}${entry.time ? ` • ${entry.time}` : ""}${entry.location ? ` • ${entry.location}` : ""}`
+      : entry.location || "No date/time assigned";
+    return `
+      <div class="cost-hub-row">
+        <details class="cost-hub-item"${isEditing ? " open" : ""}>
+          <summary class="cost-hub-summary">
+            <span class="cost-hub-title-wrap">
+              <span class="cost-hub-title">${escapeHtml(entry.title)}</span>
+              <span class="cost-hub-sub muted">${escapeHtml(entry.sourceLabel)} • ${escapeHtml(entry.category || "Misc")}</span>
+            </span>
+            <span class="cost-hub-amounts">
+              <span class="cost-hub-forecast">${moneyDisplayFromCad(amountToCad(entry.plannedUsd, entry.currency))}</span>
+              <span class="cost-hub-paid muted">${moneyDisplayFromCad(amountToCad(entry.paidUsd, entry.currency))} paid</span>
+            </span>
+          </summary>
+          <div class="cost-hub-body">
+            <div class="cost-hub-meta muted">
+              <span>${escapeHtml(scheduleMeta)}</span>
+              <span>${normalizeCurrency(entry.currency)}</span>
+              <span>${escapeHtml(entry.status || "Planned")}</span>
             </div>
-          `;
-        })
-        .join("")
-    : `<div class="itinerary-empty muted">No cost items yet. Add one to track non-itinerary expenses and shared trip costs.</div>`;
+            ${entry.notes ? `<p class="cost-hub-notes muted">${escapeHtml(entry.notes)}</p>` : ""}
+            <div class="cost-hub-detail-grid">
+              <div><strong>Forecast</strong><span>${formatEnteredMoney(entry.plannedUsd, entry.currency)}</span></div>
+              <div><strong>Paid</strong><span>${formatEnteredMoney(entry.paidUsd, entry.currency)}</span></div>
+              <div><strong>Forecast (CAD)</strong><span>${money(amountToCad(entry.plannedUsd, entry.currency), "CAD")}</span></div>
+              <div><strong>Paid (CAD)</strong><span>${money(amountToCad(entry.paidUsd, entry.currency), "CAD")}</span></div>
+            </div>
+            <div class="itinerary-card-actions cost-hub-actions">
+              ${
+                isCostItem
+                  ? `
+                    <button class="icon-btn" data-action="costEditInline" data-id="${entry.id}">Edit</button>
+                    <button class="icon-btn" data-action="markCostItemPaid" data-id="${entry.id}">Mark Paid</button>
+                    <button class="icon-btn danger" data-action="deleteCostItem" data-id="${entry.id}">Delete</button>
+                  `
+                  : `
+                    <button class="icon-btn" data-action="costHubEditActivity" data-id="${entry.id}">Edit</button>
+                    <button class="icon-btn" data-action="markPaid" data-id="${entry.id}">Mark Paid</button>
+                    <button class="icon-btn danger" data-action="delete" data-id="${entry.id}">Delete</button>
+                  `
+              }
+            </div>
+          </div>
+        </details>
+        ${
+          isCostItem
+            ? `<div class="day-detail-inline-slot" data-inline-slot="edit" data-item-id="${entry.id}"></div>`
+            : `<div class="day-detail-inline-slot" data-inline-slot="cost-hub-activity-edit" data-item-id="${entry.id}"></div>`
+        }
+      </div>
+    `;
+  };
+
+  const renderGroupSection = ({ title, subtitle, entries, emptyText }) => `
+    <section class="cost-hub-group">
+      <div class="cost-hub-group-head">
+        <div>
+          <h4>${escapeHtml(title)}</h4>
+          <p class="muted small-copy">${escapeHtml(subtitle)}</p>
+        </div>
+        <span class="cost-hub-count">${entries.length} item${entries.length === 1 ? "" : "s"}</span>
+      </div>
+      <div class="cost-hub-group-body">
+        ${entries.length ? entries.map(renderCostHubEntry).join("") : `<div class="itinerary-day-empty muted">${escapeHtml(emptyText)}</div>`}
+      </div>
+    </section>
+  `;
+
+  el.costsList.innerHTML = totalItems
+    ? `
+      <section class="cost-hub-summary-card">
+        <div class="cost-hub-summary-grid">
+          <div class="cost-hub-stat"><span class="label">Forecast</span><strong>${moneyDisplayRoundedFromCad(summary.plannedCad)}</strong></div>
+          <div class="cost-hub-stat"><span class="label">Paid</span><strong>${moneyDisplayRoundedFromCad(summary.paidCad)}</strong></div>
+          <div class="cost-hub-stat"><span class="label">Left to pay</span><strong>${moneyDisplayRoundedFromCad(outstandingCad)}</strong></div>
+          <div class="cost-hub-stat"><span class="label">Tracked items</span><strong>${totalItems}</strong></div>
+        </div>
+      </section>
+      ${renderGroupSection({
+        title: "Itenary and Activity Costs",
+        subtitle: "Scheduled activities and itinerary-linked costs",
+        entries: groups.itineraryEntries,
+        emptyText: "No itinerary-linked costs yet.",
+      })}
+      ${renderGroupSection({
+        title: "General Costs",
+        subtitle: "Shared trip costs not attached to a day",
+        entries: groups.generalEntries,
+        emptyText: "No general costs yet. Add one to track shared expenses.",
+      })}
+    `
+    : renderActionEmptyState({
+        title: "No cost items yet",
+        body: "Add your first cost to start tracking forecast and paid totals.",
+        actionPrefix: "budgetEmpty",
+      });
 
   if (uiState.costFormPlacement?.type === "edit" && uiState.costItemEditId) {
     const active = summary.costItems.find((item) => item.id === uiState.costItemEditId);
@@ -1453,11 +2231,19 @@ function renderCostsList(summary) {
     uiState.costFormPlacement = { type: "new" };
     el.costItemFormCancelEdit.textContent = "Cancel";
     el.costItemFormCancelEdit.hidden = false;
+  } else if (uiState.costFormPlacement?.type === "wizard-new") {
+    resetCostItemForm();
+    uiState.costFormPlacement = { type: "wizard-new" };
+    el.costItemFormCancelEdit.textContent = "Cancel";
+    el.costItemFormCancelEdit.hidden = false;
   } else {
     hideCostInlineForm();
   }
 
   mountCostFormInline();
+  if (uiState.itineraryFormPlacement?.type === "edit-cost-hub") {
+    mountItineraryFormInline();
+  }
 }
 
 function setDashboardQuickFormEditMode(entry) {
@@ -1936,7 +2722,7 @@ function renderTripSnapshot(summary) {
       sub: hasAnyCosts ? "Paid total (all items)" : "Add costs to calculate",
     },
     {
-      label: "Cost / Person",
+      label: "Per Person Estimate",
       currency: currencyLabel,
       value: hasCostPerPerson ? numberDisplayRoundedFromCad(summary.familySummary.perPersonPlannedCad) : "—",
       sub: travelerCount <= 0 ? "Set travelers" : hasAnyCosts ? "Uses adults + kids" : "Add costs to calculate",
@@ -1965,6 +2751,43 @@ function renderTripSnapshot(summary) {
       `
     )
     .join("");
+}
+
+function renderPlanChecklist(summary) {
+  if (!el.planChecklist) return;
+  const checks = [
+    { label: "Set dates", done: Boolean(state.settings.startDate && state.settings.endDate) },
+    { label: "Add budget", done: (Number(state.settings.totalBudgetCad) || 0) > 0 },
+    { label: "Add 1 activity", done: (summary.activities || []).length > 0 },
+    { label: "Add 1 cost", done: (summary.costItems || []).length > 0 },
+  ];
+  const allDone = checks.every((c) => c.done);
+  if (allDone) {
+    el.planChecklist.innerHTML = "";
+    el.planChecklist.hidden = true;
+    return;
+  }
+  el.planChecklist.hidden = false;
+  el.planChecklist.innerHTML = `
+    <div class="plan-checklist-card">
+      <div class="plan-checklist-head">
+        <strong>Quick setup checklist</strong>
+        <span>${checks.filter((c) => c.done).length}/${checks.length}</span>
+      </div>
+      <div class="plan-checklist-items">
+        ${checks
+          .map(
+            (check) => `
+              <div class="plan-checklist-item ${check.done ? "is-done" : ""}">
+                <span class="dot">${check.done ? "✓" : "•"}</span>
+                <span>${check.label}</span>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
 }
 
 function hasMeaningfulTripData() {
@@ -1996,10 +2819,11 @@ function confirmExampleReplaceIfNeeded() {
 function loadSampleTrip({ dismissOnboarding = false, targetTab = "dashboard", confirmReplace = true } = {}) {
   if (confirmReplace && !confirmExampleReplaceIfNeeded()) return false;
   state = normalizeImportedState(demoData);
+  uiState.planningUnlocked = true;
   familyPrefs = { adults: 2, children: 2, splitByRole: true };
   saveFamilyPrefs();
   if (dismissOnboarding) {
-    localStorage.setItem(ONBOARDING_DISMISSED_KEY, "1");
+    storageSet(ONBOARDING_DISMISSED_KEY, "1");
     uiState.onboardingVisible = false;
   }
   saveState();
@@ -2181,10 +3005,33 @@ function renderDashboard(summary) {
 
   const plannedPct = summary.budgetCad > 0 ? (summary.plannedCad / summary.budgetCad) * 100 : 0;
   const paidPct = summary.budgetCad > 0 ? (summary.paidCad / summary.budgetCad) * 100 : 0;
-  el.plannedBudgetPct.textContent = `${plannedPct.toFixed(1)}%`;
-  el.paidBudgetPct.textContent = `${paidPct.toFixed(1)}%`;
-  el.plannedBudgetBar.style.width = `${clampPct(plannedPct)}%`;
-  el.paidBudgetBar.style.width = `${clampPct(paidPct)}%`;
+  const hasBudgetInsights = summary.plannedCad > 0 || summary.paidCad > 0;
+  if (el.budgetProgressCard) {
+    el.budgetProgressCard.dataset.empty = hasBudgetInsights ? "0" : "1";
+  }
+  if (!hasBudgetInsights) {
+    el.plannedBudgetPct.textContent = "—";
+    el.paidBudgetPct.textContent = "—";
+    el.plannedBudgetBar.style.width = "0%";
+    el.paidBudgetBar.style.width = "0%";
+    if (el.budgetHealthState) {
+      el.budgetHealthState.className = "budget-health-state is-empty";
+      el.budgetHealthState.textContent = "Add your first cost to see budget insights.";
+    }
+  } else {
+    const forecastRatio = clampPct(plannedPct);
+    const healthTone = forecastRatio > 100 ? "is-over" : forecastRatio >= 85 ? "is-close" : "is-good";
+    const healthLabel =
+      forecastRatio > 100 ? "You're over budget" : forecastRatio >= 85 ? "You're close to your limit" : "You're within budget";
+    el.plannedBudgetPct.textContent = `${plannedPct.toFixed(1)}%`;
+    el.paidBudgetPct.textContent = `${paidPct.toFixed(1)}%`;
+    el.plannedBudgetBar.style.width = `${forecastRatio}%`;
+    el.paidBudgetBar.style.width = `${clampPct(paidPct)}%`;
+    if (el.budgetHealthState) {
+      el.budgetHealthState.className = `budget-health-state ${healthTone}`;
+      el.budgetHealthState.textContent = `${healthLabel} (${plannedPct.toFixed(1)}% forecast)`;
+    }
+  }
 
   renderCompactDashboardTimeline(summary);
 }
@@ -2256,11 +3103,14 @@ function renderReport(summary) {
     timeStyle: "short",
   }).format(new Date());
 
+  const travelerCountForCost = Number(summary.familySummary?.totalTravelers) || 0;
   const reportMetrics = [
     [`Budget (${displayCurrencyLabel()})`, moneyDisplayFromCad(summary.budgetCad)],
-    [`Forecast (${displayCurrencyLabel()})`, moneyDisplayFromCad(summary.plannedCad)],
-    [`Paid (${displayCurrencyLabel()})`, moneyDisplayFromCad(summary.paidCad)],
-    [`Outstanding (${displayCurrencyLabel()})`, moneyDisplayFromCad(summary.outstandingCad)],
+    [`Total Planned (${displayCurrencyLabel()})`, moneyDisplayFromCad(summary.plannedCad)],
+    [`Total Paid (${displayCurrencyLabel()})`, moneyDisplayFromCad(summary.paidCad)],
+    [`Per Person Estimate (${displayCurrencyLabel()})`, travelerCountForCost ? moneyDisplayFromCad(summary.familySummary.perPersonPlannedCad) : "—"],
+    ["Trip Days", summary.tripDays ? `${summary.tripDays}` : "—"],
+    ["Activities", String((summary.activities || []).length || 0)],
   ];
 
   el.reportMetrics.innerHTML = reportMetrics
@@ -2273,6 +3123,152 @@ function renderReport(summary) {
       `
     )
     .join("");
+
+  const breakdownRows = Object.entries(summary.byCategory).sort((a, b) => b[1].plannedCad - a[1].plannedCad);
+  if (el.reportCharts) {
+    if (!breakdownRows.length) {
+      el.reportCharts.innerHTML = `<p class="muted">No cost data yet.</p>`;
+    } else {
+      const palette = ["#0f6abf", "#1d8fe1", "#3b82f6", "#60a5fa", "#7aa2f7", "#9bb5d6", "#c7d7ee"];
+      const totalPlanned = summary.plannedCad || 1;
+      const segments = breakdownRows.map(([name, data], index) => ({
+        name,
+        data,
+        color: palette[index % palette.length],
+        share: totalPlanned > 0 ? (data.plannedCad / totalPlanned) * 100 : 0,
+      }));
+
+      let startPct = 0;
+      const donutRadius = 46;
+      const donutStroke = 20;
+      const circumference = 2 * Math.PI * donutRadius;
+      const svgSegments = segments
+        .map((seg) => {
+          const fraction = Math.max(0, seg.share) / 100;
+          const dash = fraction * circumference;
+          const offset = -(startPct / 100) * circumference;
+          startPct += seg.share;
+          return `<circle cx="60" cy="60" r="${donutRadius}" fill="none" stroke="${seg.color}" stroke-width="${donutStroke}" stroke-dasharray="${dash} ${Math.max(0, circumference - dash)}" stroke-dashoffset="${offset}"></circle>`;
+        })
+        .join("");
+
+      const barRows = segments
+        .map(
+          (seg) => `
+            <div class="report-chart-bar-row">
+              <div class="report-chart-bar-label"><span class="swatch" style="background:${seg.color}"></span>${escapeHtml(seg.name)}</div>
+              <div class="report-chart-bar-track"><div class="report-chart-bar-fill" style="width:${Math.max(0, Math.min(100, seg.share)).toFixed(1)}%; background:${seg.color};"></div></div>
+              <div class="report-chart-bar-value">${moneyDisplayFromCad(seg.data.plannedCad)}</div>
+            </div>
+          `
+        )
+        .join("");
+
+      const legendRows = segments
+        .map(
+          (seg) => `
+            <div class="report-donut-legend-row">
+              <span class="swatch" style="background:${seg.color}"></span>
+              <span>${escapeHtml(seg.name)}</span>
+              <span>${seg.share.toFixed(0)}%</span>
+            </div>
+          `
+        )
+        .join("");
+
+      el.reportCharts.innerHTML = `
+        <div class="report-charts-grid">
+          <div class="report-chart-card">
+            <h5>Forecast by Category (Bar)</h5>
+            <div class="report-chart-bars">${barRows}</div>
+          </div>
+          <div class="report-chart-card">
+            <h5>Forecast by Category (Donut)</h5>
+            <div class="report-donut-wrap">
+              <div class="report-donut-chart">
+                <svg viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+                  <circle cx="60" cy="60" r="${donutRadius}" fill="none" stroke="#edf2fb" stroke-width="${donutStroke}"></circle>
+                  ${svgSegments}
+                </svg>
+                <div class="report-donut-center">
+                  <span>Forecast</span>
+                  <strong>${compactDisplayFromCad(summary.plannedCad)}</strong>
+                  <small>${displayCurrencyLabel()}</small>
+                </div>
+              </div>
+              <div class="report-donut-legend">${legendRows}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  if (el.reportItinerarySummary) {
+    const planner = getItineraryPlannerDays(summary);
+    const summaryDays = planner.days.length ? planner.days : [];
+    const unscheduled = planner.unscheduled || [];
+    el.reportItinerarySummary.innerHTML = summaryDays.length || unscheduled.length
+      ? `
+        <div class="report-itinerary-calendar">
+          ${summaryDays
+            .map(
+              (day) => `
+                <div class="report-calendar-day">
+                  <div class="report-calendar-day-head">
+                    <strong>${escapeHtml(day.shortLabel)}</strong>
+                    <span>${day.items.length}</span>
+                  </div>
+                  <div class="report-calendar-day-body ${day.items.length ? "has-items" : "is-empty"}">
+                    ${
+                      day.items.length
+                        ? day.items
+                            .map(
+                              (item) => `
+                                <div class="report-calendar-item">
+                                  <span class="report-calendar-pill">
+                                    <span class="title">${escapeHtml(item.title)}</span>
+                                  </span>
+                                </div>
+                              `
+                            )
+                            .join("")
+                        : `<div class="muted">No items</div>`
+                    }
+                  </div>
+                </div>
+              `
+            )
+            .join("")}
+          ${
+            unscheduled.length
+              ? `
+                <div class="report-calendar-day report-calendar-day-unscheduled">
+                  <div class="report-calendar-day-head">
+                    <strong>Unscheduled</strong>
+                    <span>${unscheduled.length}</span>
+                  </div>
+                  <div class="report-calendar-day-body has-items">
+                    ${unscheduled
+                      .map(
+                        (item) => `
+                          <div class="report-calendar-item">
+                            <span class="report-calendar-pill">
+                              <span class="title">${escapeHtml(item.title)}</span>
+                            </span>
+                          </div>
+                        `
+                      )
+                      .join("")}
+                  </div>
+                </div>
+              `
+              : ""
+          }
+        </div>
+      `
+      : `<p class="muted">No itinerary items yet.</p>`;
+  }
 
   if (el.reportFamilySummary) {
     const f = summary.familySummary;
@@ -2311,7 +3307,6 @@ function renderReport(summary) {
     `;
   }
 
-  const breakdownRows = Object.entries(summary.byCategory).sort((a, b) => b[1].plannedCad - a[1].plannedCad);
   el.reportBreakdown.innerHTML = `
     <div class="report-table">
       <div class="report-table-row header">
@@ -2340,27 +3335,58 @@ function renderReport(summary) {
     </div>
   `;
 
-  el.reportTimeline.innerHTML = summary.itineraryEntries.length
-    ? summary.itineraryEntries
-        .map(
-          (item) => `
-            <div class="timeline-item">
-              <div class="timeline-date">${item.date ? dateLabel(item.date, item.time) : "Unscheduled"}</div>
-              <div class="timeline-main">
-                <h5>${escapeHtml(item.title)}</h5>
-                <p>${escapeHtml(item.location || "Location TBD")} • ${escapeHtml(item.category)} • ${escapeHtml(item.status)}${item.source === "costItem" ? " • Cost Item" : ""}</p>
-                ${item.notes ? `<p class="muted">${escapeHtml(item.notes)}</p>` : ""}
-              </div>
-              <div class="timeline-cost">
-                <strong>Forecast ${formatEnteredMoney(item.plannedUsd, item.currency)}</strong>
-                <span>Paid ${formatEnteredMoney(item.paidUsd, item.currency)}</span>
-                <span class="muted">${money(amountToCad(item.plannedUsd, item.currency), "CAD")} planned</span>
-              </div>
+  if (!summary.itineraryEntries.length) {
+    el.reportTimeline.innerHTML = `<p class="muted">No itinerary items yet.</p>`;
+  } else {
+    const grouped = [];
+    for (const item of summary.itineraryEntries) {
+      const key = item.date || "__unscheduled__";
+      let group = grouped.find((g) => g.key === key);
+      if (!group) {
+        group = {
+          key,
+          label: item.date ? dateLabel(item.date) : "Unscheduled",
+          items: [],
+        };
+        grouped.push(group);
+      }
+      group.items.push(item);
+    }
+
+    el.reportTimeline.innerHTML = grouped
+      .map(
+        (group) => `
+          <section class="timeline-day-group">
+            <div class="timeline-day-head">
+              <strong>${escapeHtml(group.label)}</strong>
+              <span>${group.items.length} item${group.items.length === 1 ? "" : "s"}</span>
             </div>
-          `
-        )
-        .join("")
-    : `<p class="muted">No itinerary items yet.</p>`;
+            <div class="timeline-day-items">
+              ${group.items
+                .map(
+                  (item) => `
+                    <div class="timeline-item">
+                      <div class="timeline-date">${escapeHtml(item.time || "--:--")}</div>
+                      <div class="timeline-main">
+                        <h5>${escapeHtml(item.title)}</h5>
+                        <p>${escapeHtml(item.location || "Location TBD")} • ${escapeHtml(item.category)} • ${escapeHtml(item.status)}${item.source === "costItem" ? " • Cost Item" : ""}</p>
+                        ${item.notes ? `<p class="muted">${escapeHtml(item.notes)}</p>` : ""}
+                      </div>
+                      <div class="timeline-cost">
+                        <strong>Forecast ${formatEnteredMoney(item.plannedUsd, item.currency)}</strong>
+                        <span>Paid ${formatEnteredMoney(item.paidUsd, item.currency)}</span>
+                        <span class="muted">${money(amountToCad(item.plannedUsd, item.currency), "CAD")} planned</span>
+                      </div>
+                    </div>
+                  `
+                )
+                .join("")}
+            </div>
+          </section>
+        `
+      )
+      .join("");
+  }
 }
 
 function render() {
@@ -2369,12 +3395,16 @@ function render() {
   syncFormModes();
   const summary = calculateSummary();
   renderTripSnapshot(summary);
+  renderPlanChecklist(summary);
+  renderSetupWizard(summary);
   renderDashboard(summary);
   renderItineraryList(summary);
   renderCostsList(summary);
   renderActivitiesTable(summary);
   renderCostItemsTable(summary);
   renderReport(summary);
+  syncPlanningLockUi();
+  enforcePlanningGatePanels();
   renderBackupUi();
   syncImportReminderModal();
   syncAboutModal();
@@ -2562,6 +3592,13 @@ function handleItineraryListClick(event) {
     return;
   }
 
+  if (action === "showItineraryNewItemForDay") {
+    showItineraryNewItemFormForDate(button.dataset.date || "");
+    render();
+    requestAnimationFrame(() => el.activityInputs.title?.focus());
+    return;
+  }
+
   if (action === "itineraryEditInline") {
     const item = state.activities.find((a) => a.id === id);
     if (!item) return;
@@ -2626,8 +3663,22 @@ function handleCostsListClick(event) {
     return;
   }
 
+  if (action === "costHubEditActivity") {
+    const item = state.activities.find((a) => a.id === id);
+    if (!item) return;
+    setActivityFormEditMode(item, { placementType: "edit-cost-hub" });
+    render();
+    requestAnimationFrame(() => el.activityInputs.title?.focus());
+    return;
+  }
+
   if (action === "markCostItemPaid" || action === "deleteCostItem") {
     handleCostItemsTableClick(event);
+    return;
+  }
+
+  if (action === "markPaid" || action === "delete") {
+    handleTableClick(event);
   }
 }
 
@@ -2638,7 +3689,26 @@ function handleCategoryBreakdownClick(event) {
 }
 
 function resetDemoData() {
-  loadSampleTrip({ dismissOnboarding: false, targetTab: "dashboard", confirmReplace: true });
+  closeAppMenu();
+  const shouldReset = window.confirm("Reset will erase current trip data on this device. Continue?");
+  if (!shouldReset) return;
+  state = buildEmptyState();
+  familyPrefs = { adults: 2, children: 0, splitByRole: false };
+  saveFamilyPrefs();
+  uiState.itineraryFormPlacement = null;
+  uiState.costFormPlacement = null;
+  uiState.itineraryEditId = null;
+  uiState.costItemEditId = null;
+  uiState.dashboardDayModalOpen = false;
+  uiState.importReminderOpen = false;
+  uiState.planningUnlocked = false;
+  uiState.setupWizardVisible = false;
+  uiState.setupWizardMinimized = false;
+  uiState.setupWizardStep = 1;
+  saveState();
+  switchTab("plan");
+  render();
+  showToast("Trip reset.");
 }
 
 function dismissOnboardingPanelOnly() {
@@ -2685,6 +3755,7 @@ function recordBackupExport(fileName, nowIso = new Date().toISOString()) {
   meta.lastDataChangeAt = nowIso;
   saveState(false);
   renderBackupUi();
+  maybeQueueSupportBannerAfterMeaningfulAction("export");
 }
 
 async function handleGlobalSaveClick() {
@@ -2727,24 +3798,56 @@ function openImportPicker({ confirmReplace = false } = {}) {
   el.importJsonFile.click();
 }
 
+function resolveMode(tabOrMode) {
+  const raw = String(tabOrMode || "").toLowerCase();
+  if (raw === "plan" || raw === "budget" || raw === "summary") return raw;
+  if (raw === "itinerary" || raw === "settings") return "plan";
+  if (raw === "costs" || raw === "dashboard") return "budget";
+  if (raw === "report") return "summary";
+  return "plan";
+}
+
+function getModePanels(mode) {
+  return (
+    {
+      plan: ["itinerary", "settings"],
+      budget: ["costs", "dashboard"],
+      summary: ["report"],
+    }[mode] || ["itinerary", "settings"]
+  );
+}
+
 function switchTab(tabName) {
-  if (tabName === "itinerary") {
+  const requestedMode = resolveMode(tabName);
+  if (requestedMode === "plan" && isPlanningLocked()) {
+    openSetupWizard({ step: 1, scroll: true });
+    return;
+  }
+  const mode = requestedMode;
+  if (mode !== "plan") {
     hideItineraryInlineForm();
     resetActivityForm();
   }
-  if (tabName === "costs") {
+  if (mode !== "budget") {
     hideCostInlineForm();
     resetCostItemForm();
   }
+  const visiblePanels = new Set(getModePanels(mode));
+
+  storageSet(ACTIVE_MODE_KEY, mode);
   el.tabButtons.forEach((button) => {
-    const isActive = button.dataset.tabTarget === tabName;
+    const isActive = button.dataset.modeTarget === mode;
     button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
   el.tabPanels.forEach((panel) => {
-    const isActive = panel.dataset.tabPanel === tabName;
+    const isActive = visiblePanels.has(panel.dataset.tabPanel);
     panel.hidden = !isActive;
     panel.classList.toggle("active", isActive);
   });
+  if (el.tripSnapshotSection) {
+    el.tripSnapshotSection.hidden = mode !== "summary";
+  }
 }
 
 function handleDashboardTimelineClick(event) {
@@ -2792,8 +3895,36 @@ function closeImportReminder() {
   renderSupportUi();
 }
 
+function syncAppMenu() {
+  if (!el.appMenu) return;
+  el.appMenu.hidden = !uiState.appMenuOpen;
+  if (el.appMenuBtn) {
+    el.appMenuBtn.setAttribute("aria-expanded", uiState.appMenuOpen ? "true" : "false");
+  }
+  syncBodyScrollLock();
+}
+
+function openAppMenu() {
+  uiState.appMenuOpen = true;
+  syncAppMenu();
+  requestAnimationFrame(() => focusModalPrimaryAction(el.appMenu));
+}
+
+function closeAppMenu() {
+  uiState.appMenuOpen = false;
+  syncAppMenu();
+}
+
+function handleAppMenuClick(event) {
+  if (event.target === el.appMenu || event.target.dataset.menuClose === "1") {
+    closeAppMenu();
+  }
+}
+
 function syncBodyScrollLock() {
-  const hasOpenModal = Boolean(uiState.dashboardDayModalOpen || uiState.importReminderOpen || uiState.aboutModalOpen);
+  const hasOpenModal = Boolean(
+    uiState.dashboardDayModalOpen || uiState.importReminderOpen || uiState.aboutModalOpen || uiState.appMenuOpen
+  );
   const body = document.body;
   if (!body) return;
 
@@ -2815,7 +3946,15 @@ function syncBodyScrollLock() {
 }
 
 function showImportReminderOnLoad() {
-  openImportReminder();
+  // Initial welcome popup disabled. Trip opens directly to the app.
+}
+
+function enforceBlankLaunchState() {
+  state = buildEmptyState();
+  uiState.planningUnlocked = false;
+  uiState.setupWizardVisible = false;
+  uiState.setupWizardMinimized = false;
+  uiState.setupWizardStep = 1;
 }
 
 function handleImportReminderModalClick(event) {
@@ -2878,6 +4017,10 @@ function handleDashboardDayModalClick(event) {
 function handleGlobalKeydown(event) {
   if (trapFocusInModal(event)) return;
   if (event.key !== "Escape") return;
+  if (uiState.appMenuOpen) {
+    closeAppMenu();
+    return;
+  }
   if (uiState.importReminderOpen) {
     closeImportReminder();
     return;
@@ -2922,6 +4065,7 @@ async function importJsonBackup(event) {
       return;
     }
     state = normalizeImportedState(incoming);
+    uiState.planningUnlocked = true;
     const nowIso = new Date().toISOString();
     const meta = backupMeta();
     meta.lastImportAt = nowIso;
@@ -2983,19 +4127,46 @@ el.categoryBreakdown?.addEventListener("click", handleCategoryBreakdownClick);
 el.dashboardItinerary.addEventListener("click", handleDashboardTimelineClick);
 el.dashboardItinerary.addEventListener("keydown", handleDashboardTimelineKeydown);
 el.dashboardDayDetail.addEventListener("click", handleDashboardDayModalClick);
-el.printReportBtn.addEventListener("click", () => window.print());
-el.resetDemoBtn.addEventListener("click", resetDemoData);
-el.startPlanningBtn?.addEventListener("click", () => openImportPicker({ confirmReplace: true }));
+el.printReportBtn?.addEventListener("click", () => {
+  closeAppMenu();
+  switchTab("summary");
+  window.print();
+  maybeQueueSupportBannerAfterMeaningfulAction("export");
+});
+el.resetDemoBtn?.addEventListener("click", resetDemoData);
+el.startPlanningBtn?.addEventListener("click", startPlanningFromHero);
+el.heroLoadDemoBtn?.addEventListener("click", () =>
+  loadSampleTrip({ dismissOnboarding: true, targetTab: "dashboard", confirmReplace: true })
+);
+el.openTripBtn?.addEventListener("click", () => {
+  closeAppMenu();
+  openImportPicker({ confirmReplace: true });
+});
 el.loadSampleTripBtn?.addEventListener("click", loadSampleTripFromOnboarding);
 el.startEmptyTripBtn?.addEventListener("click", startEmptyTripFromOnboarding);
 el.onboardingImportBackupBtn?.addEventListener("click", () => openImportPicker({ confirmReplace: false }));
 el.dismissOnboardingBtn?.addEventListener("click", dismissOnboardingPanelOnly);
-el.aboutAppBtn?.addEventListener("click", openAboutModal);
+el.setupWizardCard?.addEventListener("click", handleSetupWizardClick);
+el.aboutAppBtn?.addEventListener("click", () => {
+  closeAppMenu();
+  openAboutModal();
+});
 el.footerAboutBtn?.addEventListener("click", openAboutModal);
 el.exportJsonBtn.addEventListener("click", exportJsonBackup);
 el.importJsonBtn.addEventListener("click", () => openImportPicker({ confirmReplace: false }));
 el.importJsonFile.addEventListener("change", importJsonBackup);
 el.globalSaveBtn?.addEventListener("click", handleGlobalSaveClick);
+el.menuSaveTripBtn?.addEventListener("click", () => {
+  closeAppMenu();
+  handleGlobalSaveClick();
+});
+el.appMenuBtn?.addEventListener("click", () => {
+  if (uiState.appMenuOpen) closeAppMenu();
+  else openAppMenu();
+});
+el.footerMenuBtn?.addEventListener("click", openAppMenu);
+el.appMenuCloseBtn?.addEventListener("click", closeAppMenu);
+el.appMenu?.addEventListener("click", handleAppMenuClick);
 el.importReminderModal?.addEventListener("click", handleImportReminderModalClick);
 el.importReminderImportBtn?.addEventListener("click", () => {
   closeImportReminder();
@@ -3017,9 +4188,16 @@ el.activityFormModeButtons.advanced?.addEventListener("click", () => setItinerar
 el.costItemFormModeButtons.basic?.addEventListener("click", () => setCostFormUiMode("basic"));
 el.costItemFormModeButtons.advanced?.addEventListener("click", () => setCostFormUiMode("advanced"));
 el.tabButtons.forEach((button) => {
-  button.addEventListener("click", () => switchTab(button.dataset.tabTarget));
+  button.addEventListener("click", () => {
+    if (button.dataset.modeTarget === "plan" && isPlanningLocked()) {
+      openSetupWizard({ step: 1, scroll: true });
+      return;
+    }
+    switchTab(button.dataset.modeTarget);
+  });
 });
 
 uiState.appReady = true;
+enforceBlankLaunchState();
 render();
-showImportReminderOnLoad();
+switchTab(isPlanningLocked() ? "summary" : storageGet(ACTIVE_MODE_KEY) || "plan");

@@ -59,11 +59,21 @@
     }
   </script>
   <link rel="stylesheet" href="styles.css" />
+
+  <!-- Shared V2 components, bundled locally by the portable site build. -->
+  <link rel="stylesheet" href="https://core.simplekit.app/v2/foundations.css">
+  <link rel="stylesheet" href="https://core.simplekit.app/v2/system.css">
+  <link rel="stylesheet" href="https://core.simplekit.app/v2/calculators.css">
+  <link rel="stylesheet" href="./v2-calculator.css">
+  <script defer src="https://core.simplekit.app/v2/shell.js"></script>
 </head>
-<body>
+<body class="sk-v2" data-v2-system="1" data-v2-calculator="travel-planner" data-v2-family="tax-travel">
+<a class="v2s-skip v2-button" href="#mainContent">Skip to content</a>
+<header class="v2s-header"><div class="v2s-wrap v2s-header-inner"><a class="v2s-brand" href="/" aria-label="SimpleKit home"><svg aria-hidden="true" focusable="false"><use href="https://core.simplekit.app/v2/icons/sprite.svg#calculator"></use></svg>SimpleKit</a><button type="button" class="v2s-menu" data-v2s-menu aria-controls="v2-travel-planner-nav" aria-expanded="false" hidden>Menu</button><nav class="v2s-nav" id="v2-travel-planner-nav" aria-label="Main navigation"><a href="/">Home</a><a href="/tools/" aria-current="page">Tools</a><a href="/learn/">Learn</a><a href="/about/">About</a><a href="/support/">Support</a></nav></div></header>
+
   <div class="page-shell">
-    <header class="hero">
-      <div data-simplekit-header></div>
+    <header class="hero v2c-hero">
+      
       <div class="hero-content">
         <p class="eyebrow">TravelPlanner • Family budget • Local-first</p>
         <h1 id="heroTripTitle">Plan your trip without spreadsheets.</h1>
@@ -107,14 +117,14 @@
       <div id="tripSnapshotGrid" class="trip-snapshot-grid" aria-live="polite"></div>
     </section>
 
-    <main class="tabbed-layout">
+    <main class="tabbed-layout v2c-main" id="mainContent" tabindex="-1">
       <nav class="tabs no-print" aria-label="App Sections">
         <button type="button" class="tab-btn active" data-mode-target="plan">Plan</button>
         <button type="button" class="tab-btn" data-mode-target="budget">Budget</button>
         <button type="button" class="tab-btn" data-mode-target="summary">Summary</button>
       </nav>
 
-      <section class="panel dashboard-panel tab-panel active" data-tab-panel="dashboard" aria-labelledby="dashboard-heading">
+      <section class="panel dashboard-panel tab-panel active v2c-surface" data-tab-panel="dashboard" aria-labelledby="dashboard-heading">
         <div class="panel-header">
           <h2 id="dashboard-heading">Budget Dashboard</h2>
           <p>Forecast vs paid totals and category breakdown</p>
@@ -163,7 +173,7 @@
         </div>
       </section>
 
-      <section class="panel activities-panel tab-panel" data-tab-panel="itinerary" aria-labelledby="timeline-heading" hidden>
+      <section class="panel activities-panel tab-panel v2c-surface" data-tab-panel="itinerary" aria-labelledby="timeline-heading" hidden>
         <div class="panel-header">
           <h2 id="timeline-heading">Itinerary Builder</h2>
           <p>Build your trip itinerary with scheduled activities and costs</p>
@@ -246,7 +256,7 @@
 
         <div id="itineraryList" class="itinerary-list no-print"></div>
 
-        <div class="table-wrap itinerary-table-legacy" hidden>
+        <div class="table-wrap itinerary-table-legacy v2c-table" hidden>
           <table id="activitiesTable">
             <thead>
               <tr>
@@ -267,7 +277,7 @@
         </div>
       </section>
 
-      <section class="panel costs-panel tab-panel" data-tab-panel="costs" aria-labelledby="cost-items-heading" hidden>
+      <section class="panel costs-panel tab-panel v2c-surface" data-tab-panel="costs" aria-labelledby="cost-items-heading" hidden>
         <div class="panel-header">
           <h2 id="cost-items-heading">Additional Cost Items</h2>
           <p>Add cost line items and optionally include them on the itinerary</p>
@@ -355,7 +365,7 @@
 
         <div id="costsList" class="itinerary-list no-print"></div>
 
-        <div class="table-wrap itinerary-table-legacy" hidden>
+        <div class="table-wrap itinerary-table-legacy v2c-table" hidden>
           <table id="costItemsTable">
             <thead>
               <tr>
@@ -373,7 +383,7 @@
         </div>
       </section>
 
-      <section class="panel control-panel no-print tab-panel" data-tab-panel="settings" aria-labelledby="trip-settings-heading" hidden>
+      <section class="panel control-panel no-print tab-panel v2c-surface" data-tab-panel="settings" aria-labelledby="trip-settings-heading" hidden>
         <div class="panel-header">
           <h2 id="trip-settings-heading">Trip Settings</h2>
           <p>Trip details and exchange rate</p>
@@ -453,7 +463,7 @@
         </div>
       </section>
 
-      <section class="panel report-panel tab-panel" data-tab-panel="report" aria-labelledby="report-heading" hidden>
+      <section class="panel report-panel tab-panel v2c-surface" data-tab-panel="report" aria-labelledby="report-heading" hidden>
         <div class="panel-header">
           <h2 id="report-heading">Printable Report</h2>
           <p>Designed for print / PDF sharing</p>
@@ -505,7 +515,7 @@
         </div>
       </section>
 
-      <section class="panel" aria-labelledby="canadaContextHeading-travel-planner">
+      <section class="panel v2c-surface" aria-labelledby="canadaContextHeading-travel-planner">
         <div class="panel-header">
           <div>
             <p class="section-kicker">Canadian context</p>
@@ -532,7 +542,7 @@
         </div>
       </section>
       <div data-simplekit-support></div>
-      <div data-simplekit-footer></div>
+      
     </main>
   </div>
 
@@ -689,5 +699,8 @@
 
   <script type="module" src="https://core.simplekit.app/core.js"></script>
   <script src="app.js"></script>
+
+<footer class="v2s-footer"><div class="v2s-wrap v2s-footer-inner"><div class="v2s-stack"><strong>SimpleKit</strong><p class="v2s-help">Free planning tools with clearer next steps.</p></div><div class="v2s-stack"><nav aria-label="Footer navigation"><a href="/tools/">Tools</a><a href="/learn/">Learn</a><a href="/methodology/">Methodology &amp; sources</a><a href="/privacy/">Privacy</a><a href="/support/">Support</a></nav><p class="v2s-help">Estimates for planning, not financial advice. Financial inputs stay in your browser; existing site analytics are described in our privacy policy.</p></div></div></footer>
+<script defer src="https://core.simplekit.app/v2/calculators.js"></script>
 </body>
 </html>

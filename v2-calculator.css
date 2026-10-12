@@ -29,3 +29,6 @@
  .sk-v2[data-v2-calculator="travel-planner"] :where(.form-grid,.field-grid,.advanced-grid,.input-grid,.salary-grid,.calculator-grid,.group-grid,.hero-grid,.settings-inline-grid) { grid-template-columns:minmax(0,1fr); }
  .sk-v2[data-v2-calculator="travel-planner"] :where(.form-actions,.toolbar-actions,.action-group,.wizard-actions,.backup-actions) { flex-wrap:wrap; }
 }
+
+/* Keep the backup action clear of the shared navigation and page controls. */
+.sk-v2[data-v2-calculator="travel-planner"] .global-fab-row { position:static; max-width:72rem; margin:0 auto 1.25rem; padding:0 1rem; justify-content:flex-end; }

@@ -16,6 +16,8 @@
 .sk-v2[data-v2-calculator="travel-planner"] .tabs { position:static; display:flex; flex-wrap:wrap; gap:.5rem; padding:.5rem; background:var(--v2-surface); border:1px solid var(--v2-border); border-radius:var(--v2-radius-card); }
 .sk-v2[data-v2-calculator="travel-planner"] .itinerary-day-block,.sk-v2[data-v2-calculator="travel-planner"] .itinerary-card,.sk-v2[data-v2-calculator="travel-planner"] .dashboard-modal-card,.sk-v2[data-v2-calculator="travel-planner"] .app-menu-card { background:var(--v2-surface); border-color:var(--v2-border); border-radius:var(--v2-radius-card); }
 .sk-v2[data-v2-calculator="travel-planner"] .itinerary-day-add-btn,.sk-v2[data-v2-calculator="travel-planner"] .mode-btn { min-height:44px; }
+.sk-v2[data-v2-calculator="travel-planner"] .timeline-day-head { width:100%; border:0; background:transparent; padding:.25rem; }
+.sk-v2[data-v2-calculator="travel-planner"] .timeline-pill.costItem { background:#a3450b; }
 @media(min-width:64rem) {
  .sk-v2[data-v2-calculator="travel-planner"] .settings-inline-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }
 }

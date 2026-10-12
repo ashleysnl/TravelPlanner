@@ -2427,10 +2427,10 @@ function renderCompactDashboardTimeline(summary) {
       const overflow = items.length > 2 ? `<div class="timeline-overflow">+${items.length - 2} more</div>` : "";
       const selectedClass = uiState.dashboardSelectedDate === key ? " selected" : "";
       return `
-        <div class="timeline-day${selectedClass}" data-date="${key}" role="button" tabindex="0" aria-pressed="${uiState.dashboardSelectedDate === key}">
-          <div class="timeline-day-head">
+        <div class="timeline-day${selectedClass}" data-date="${key}" role="group" aria-label="${escapeHtml(dayShortFmt.format(date) + ' • ' + monthDayFmt.format(date))}">
+          <button type="button" class="timeline-day-head" aria-pressed="${uiState.dashboardSelectedDate === key}">
             <strong>${dayShortFmt.format(date)} • ${monthDayFmt.format(date)}</strong>
-          </div>
+          </button>
           <div class="timeline-marker-row">${markers || '<span class="timeline-empty">-</span>'}${overflow}</div>
         </div>
       `;
